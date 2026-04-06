@@ -1,0 +1,51 @@
+# Web框架
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.19
+jinja2==3.1.5
+
+# 数据库
+sqlalchemy[asyncio]==2.0.36
+aiosqlite==0.20.0
+alembic==1.14.1
+
+# 爬虫相关
+httpx==0.28.1
+playwright==1.49.1
+beautifulsoup4==4.12.3
+lxml==5.3.0
+
+# 任务调度
+apscheduler==3.10.4
+celery[redis]==5.4.0
+redis==5.2.1
+
+# LLM
+openai==1.58.1
+
+# 通知
+apprise==1.9.2
+
+# 媒体下载
+yt-dlp==2024.12.23
+
+# 数据处理
+pandas==2.2.3
+pydantic==2.10.4
+pydantic-settings==2.7.1
+orjson==3.10.12
+
+# 工具
+loguru==0.7.3
+python-dotenv==1.0.1
+rich==13.9.4
+typer==0.15.1
+aiofiles==24.1.0
+tenacity==9.0.0
+
+# 安全/加密
+cryptography==44.0.0
+
+# 测试
+pytest==8.3.4
+pytest-asyncio==0.24.0
