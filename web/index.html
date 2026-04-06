@@ -110,6 +110,20 @@
                         </div>
                     </div>
 
+                    <!-- URL粘贴抓取 —— 最核心的入口 -->
+                    <div class="bg-white rounded-2xl border border-gray-100 p-5">
+                        <div class="flex items-center space-x-3">
+                            <input v-model="urlInput" @keyup.enter="extractUrl"
+                                class="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 outline-none transition"
+                                placeholder="粘贴视频链接，支持 抖音 / B站 / YouTube / TikTok / Twitter / Instagram">
+                            <button @click="extractUrl" :disabled="extracting || !urlInput"
+                                class="bg-brand-600 text-white px-6 py-3 rounded-xl text-sm hover:bg-brand-700 transition disabled:opacity-40 font-medium whitespace-nowrap">
+                                {{ extracting ? '抓取中...' : '&#128229; 抓取' }}
+                            </button>
+                        </div>
+                        <p class="text-[11px] text-gray-400 mt-2">直接粘贴视频链接，自动识别平台、提取标题/播放量/点赞等数据并保存</p>
+                    </div>
+
                     <!-- 统计 -->
                     <div class="grid grid-cols-4 gap-4">
                         <div v-for="s in stats" :key="s.label" class="bg-white rounded-xl border border-gray-100 px-5 py-4">
@@ -662,8 +676,8 @@ createApp({
             { key:'analysis', label:'选题分析', icon:'&#128202;' },
             { key:'scripts', label:'脚本', icon:'&#128221;' },
         ]);
-        const platforms = ['xhs','douyin','bilibili','weibo','kuaishou'];
-        const pNames = {xhs:'小红书',douyin:'抖音',bilibili:'B站',weibo:'微博',kuaishou:'快手'};
+        const platforms = ['douyin','bilibili','xhs','weibo','youtube','twitter','tiktok','instagram'];
+        const pNames = {xhs:'小红书',douyin:'抖音',bilibili:'B站',weibo:'微博',youtube:'YouTube',twitter:'Twitter/X',tiktok:'TikTok',instagram:'Instagram',other:'其他'};
         const pName = p => pNames[p]||p;
         const currentTabLabel = computed(() => tabs.value.find(t=>t.key===activeTab.value)?.label||'');
 
@@ -680,6 +694,8 @@ createApp({
         const toasts = ref([]);
         let tid = 0;
 
+        const urlInput = ref('');
+        const extracting = ref(false);
         const detailItem = ref(null);
         const chartData = ref({});
         const platformChart = ref(null);
@@ -774,14 +790,27 @@ createApp({
         const copyScript = s=>{navigator.clipboard?.writeText(s.full_script||`${s.hook}\n\n${s.body}\n\n${s.cta}`);toast('已复制','success')};
 
         // helpers
-        const pCls = p=>({'bg-red-100 text-red-700':p==='xhs','bg-gray-800 text-white':p==='douyin','bg-sky-100 text-sky-700':p==='bilibili','bg-amber-100 text-amber-700':p==='weibo','bg-orange-100 text-orange-700':p==='kuaishou'});
+        const pCls = p=>({'bg-red-100 text-red-700':p==='xhs','bg-gray-800 text-white':p==='douyin','bg-sky-100 text-sky-700':p==='bilibili','bg-amber-100 text-amber-700':p==='weibo','bg-red-600 text-white':p==='youtube','bg-blue-500 text-white':p==='twitter','bg-gray-900 text-white':p==='tiktok','bg-pink-500 text-white':p==='instagram','bg-gray-100 text-gray-600':p==='other'});
         const fmtTime = t=>t?new Date(t).toLocaleString('zh-CN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'-';
         const fmtNum = n=>n>=10000?(n/10000).toFixed(1)+'w':(n||0);
         const buildUrl = (p,uid)=>({bilibili:`https://space.bilibili.com/${uid}`,douyin:`https://www.douyin.com/user/${uid}`,xhs:`https://www.xiaohongshu.com/user/profile/${uid}`,weibo:`https://m.weibo.cn/u/${uid}`,kuaishou:`https://www.kuaishou.com/profile/${uid}`}[p]||'');
         const uidHint = computed(()=>({bilibili:'UID数字, 如 163637592',douyin:'sec_user_id',xhs:'用户ID',weibo:'UID数字',kuaishou:'用户ID'}[newKol.platform]||''));
         const uidHelp = computed(()=>({bilibili:'打开UP主主页，URL中的数字',douyin:'打开主页，URL中user/后面的字符串',xhs:'打开主页，URL中profile/后面的ID',weibo:'打开主页，URL中u/后面的数字',kuaishou:'打开主页，URL中profile/后面的ID'}[newKol.platform]||''));
 
-        // 新增功能
+        // URL抓取
+        const extractUrl = async()=>{
+            if(!urlInput.value)return;
+            extracting.value=true;
+            const t=toast('正在抓取...','loading');
+            try{const d=await api('/crawl/url',{method:'POST',body:{url:urlInput.value,save:true}});
+                rmToast(t);
+                if(d.success){toast(d.message,'success',4000);urlInput.value='';loadContents();loadStats()}
+                else{toast(d.message||'抓取失败','error')}
+            }catch(e){rmToast(t);toast(`抓取失败: ${e.message}`,'error')}
+            extracting.value=false;
+        };
+
+        // 内容详情
         const openDetail = async(item)=>{
             try{const d=await api(`/contents/${item.id}/detail`);detailItem.value=d}catch(e){toast('加载失败','error')}
         };
@@ -834,10 +863,10 @@ createApp({
         onMounted(refreshAll);
         return {activeTab,tabs,platforms,pName,pCls,currentTabLabel,stats,kols,contents,cTotal,cPage,cPageSize,cFilter,trends,scripts,toasts,
             showAddKol,showSearch,showGenScript,generating,searching,searchDone,searchResults,searchForm,newKol,newScript,
-            detailItem,chartData,platformChart,engagementChart,
+            detailItem,chartData,platformChart,engagementChart,urlInput,extracting,
             refreshAll,switchTab,loadContents,addKol,deleteKol,toggleMonitor,crawlKol,crawlComments,doSearch,viewKolContents,
             analyzeKol,analyzeContent,genScript,generateFromTrend,deleteScript,copyScript,fmtTime,fmtNum,uidHint,uidHelp,
-            openDetail,crawlDetailComments,refreshKolProfile,saveSearchItem};
+            openDetail,crawlDetailComments,refreshKolProfile,saveSearchItem,extractUrl};
     }
 }).mount('#app');
 </script>

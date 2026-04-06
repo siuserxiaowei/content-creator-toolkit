@@ -280,3 +280,122 @@ async def save_search_result(req: SaveSearchItemRequest):
         db.add(content)
         await db.commit()
         return {"message": f"已保存: {req.title[:30]}", "saved": True}
+
+
+class UrlExtractRequest(BaseModel):
+    """通用URL抓取"""
+    url: str = Field(..., description="视频/帖子URL（支持抖音/B站/YouTube/Twitter/Instagram/TikTok）")
+    save: bool = Field(default=True, description="是否保存到内容库")
+    kol_id: int = 0
+
+
+class BatchUrlRequest(BaseModel):
+    """批量URL抓取"""
+    urls: list = Field(..., description="URL列表")
+    save: bool = True
+    kol_id: int = 0
+
+
+@router.post("/url")
+async def extract_by_url(req: UrlExtractRequest):
+    """通用URL抓取 - 粘贴任何视频链接，自动提取元数据
+
+    支持平台: 抖音/B站/YouTube/TikTok/Twitter/Instagram
+    """
+    from core.crawler.ytdlp_engine import ytdlp_engine
+
+    logger.info(f"URL抓取: {req.url}")
+    info = await ytdlp_engine.extract_video_info(req.url)
+    if not info:
+        return {"message": "抓取失败，请检查URL是否正确", "success": False}
+
+    result = {
+        "message": f"抓取成功: {info.get('title', '')[:40]}",
+        "success": True,
+        "data": info,
+    }
+
+    if req.save:
+        async with async_session() as db:
+            existing = await db.execute(
+                select(Content).where(
+                    Content.platform == info["platform"],
+                    Content.content_id == info["content_id"],
+                )
+            )
+            if existing.scalar_one_or_none():
+                result["message"] += " (已存在，跳过保存)"
+            else:
+                content = Content(
+                    kol_id=req.kol_id if req.kol_id > 0 else None,
+                    platform=info["platform"],
+                    content_type=info["content_type"],
+                    content_id=info["content_id"],
+                    title=info["title"],
+                    description=info.get("description", ""),
+                    url=info["url"],
+                    cover_url=info.get("cover_url", ""),
+                    media_urls=info.get("media_urls"),
+                    tags=info.get("tags", ""),
+                    like_count=info.get("like_count", 0),
+                    comment_count=info.get("comment_count", 0),
+                    share_count=info.get("share_count", 0),
+                    view_count=info.get("view_count", 0),
+                    published_at=info.get("published_at"),
+                    raw_data=info.get("raw_data"),
+                )
+                db.add(content)
+                await db.commit()
+                result["message"] += " (已保存)"
+
+    return result
+
+
+@router.post("/batch-url")
+async def extract_batch_urls(req: BatchUrlRequest):
+    """批量URL抓取"""
+    from core.crawler.ytdlp_engine import ytdlp_engine
+
+    logger.info(f"批量URL抓取: {len(req.urls)}个")
+    results = await ytdlp_engine.extract_batch(req.urls)
+
+    saved = 0
+    if req.save and results:
+        async with async_session() as db:
+            for info in results:
+                existing = await db.execute(
+                    select(Content).where(
+                        Content.platform == info["platform"],
+                        Content.content_id == info["content_id"],
+                    )
+                )
+                if existing.scalar_one_or_none():
+                    continue
+                content = Content(
+                    kol_id=req.kol_id if req.kol_id > 0 else None,
+                    platform=info["platform"],
+                    content_type=info["content_type"],
+                    content_id=info["content_id"],
+                    title=info["title"],
+                    description=info.get("description", ""),
+                    url=info["url"],
+                    cover_url=info.get("cover_url", ""),
+                    media_urls=info.get("media_urls"),
+                    tags=info.get("tags", ""),
+                    like_count=info.get("like_count", 0),
+                    comment_count=info.get("comment_count", 0),
+                    share_count=info.get("share_count", 0),
+                    view_count=info.get("view_count", 0),
+                    published_at=info.get("published_at"),
+                    raw_data=info.get("raw_data"),
+                )
+                db.add(content)
+                saved += 1
+            await db.commit()
+
+    return {
+        "message": f"批量抓取完成: {len(results)}成功, {saved}条已保存",
+        "total": len(results),
+        "saved": saved,
+        "items": [{"title": r.get("title", "")[:40], "platform": r.get("platform"), "url": r.get("url")} for r in results],
+    }
