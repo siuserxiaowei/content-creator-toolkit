@@ -1,6 +1,9 @@
 """数据模型 - 所有业务实体"""
 
+from __future__ import annotations
+
 from datetime import datetime
+from typing import Optional, List
 from sqlalchemy import String, Text, Integer, Float, Boolean, DateTime, JSON, ForeignKey, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from storage.database import Base
@@ -21,12 +24,12 @@ class KOL(Base):
     tags: Mapped[str] = mapped_column(String(500), default="", comment="标签，逗号分隔")
     is_monitoring: Mapped[bool] = mapped_column(Boolean, default=True, comment="是否正在监控")
     check_interval: Mapped[int] = mapped_column(Integer, default=3600, comment="检查间隔(秒)")
-    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_checked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    contents: Mapped[list["Content"]] = relationship(back_populates="kol", cascade="all, delete-orphan")
-    monitor_logs: Mapped[list["MonitorLog"]] = relationship(back_populates="kol", cascade="all, delete-orphan")
+    contents: Mapped[List["Content"]] = relationship(back_populates="kol", cascade="all, delete-orphan")
+    monitor_logs: Mapped[List["MonitorLog"]] = relationship(back_populates="kol", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("idx_kol_platform_uid", "platform", "platform_uid", unique=True),
@@ -38,7 +41,7 @@ class Content(Base):
     __tablename__ = "contents"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    kol_id: Mapped[int] = mapped_column(ForeignKey("kols.id"), comment="关联KOL")
+    kol_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kols.id"), nullable=True, comment="关联KOL，搜索结果可为空")
     platform: Mapped[str] = mapped_column(String(20))
     content_type: Mapped[str] = mapped_column(String(20), comment="类型: video/article/note/short_video")
     content_id: Mapped[str] = mapped_column(String(200), comment="平台内容ID")
@@ -46,21 +49,21 @@ class Content(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     url: Mapped[str] = mapped_column(String(500))
     cover_url: Mapped[str] = mapped_column(String(500), default="")
-    media_urls: Mapped[dict | None] = mapped_column(JSON, nullable=True, comment="媒体文件URL列表")
+    media_urls: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, comment="媒体文件URL列表")
     tags: Mapped[str] = mapped_column(String(500), default="", comment="内容标签")
     like_count: Mapped[int] = mapped_column(Integer, default=0)
     comment_count: Mapped[int] = mapped_column(Integer, default=0)
     share_count: Mapped[int] = mapped_column(Integer, default=0)
     view_count: Mapped[int] = mapped_column(Integer, default=0)
-    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    raw_data: Mapped[dict | None] = mapped_column(JSON, nullable=True, comment="原始数据JSON")
+    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    raw_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, comment="原始数据JSON")
     is_downloaded: Mapped[bool] = mapped_column(Boolean, default=False)
     is_analyzed: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     kol: Mapped["KOL"] = relationship(back_populates="contents")
-    comments: Mapped[list["Comment"]] = relationship(back_populates="content", cascade="all, delete-orphan")
-    analysis: Mapped["TopicAnalysis | None"] = relationship(back_populates="content", uselist=False)
+    comments: Mapped[List["Comment"]] = relationship(back_populates="content", cascade="all, delete-orphan")
+    analysis: Mapped[Optional["TopicAnalysis"]] = relationship(back_populates="content", uselist=False)
 
     __table_args__ = (
         Index("idx_content_platform_id", "platform", "content_id", unique=True),
@@ -80,7 +83,7 @@ class Comment(Base):
     user_id: Mapped[str] = mapped_column(String(200), default="")
     text: Mapped[str] = mapped_column(Text)
     like_count: Mapped[int] = mapped_column(Integer, default=0)
-    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     content: Mapped["Content"] = relationship(back_populates="comments")
@@ -113,7 +116,7 @@ class TopicAnalysis(Base):
     structure_summary: Mapped[str] = mapped_column(Text, default="", comment="内容结构摘要")
     engagement_score: Mapped[float] = mapped_column(Float, default=0.0, comment="互动率评分")
     replicability_score: Mapped[float] = mapped_column(Float, default=0.0, comment="可复制性评分")
-    analysis_detail: Mapped[dict | None] = mapped_column(JSON, nullable=True, comment="详细分析JSON")
+    analysis_detail: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, comment="详细分析JSON")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     content: Mapped["Content"] = relationship(back_populates="analysis")
@@ -133,8 +136,8 @@ class GeneratedScript(Base):
     body: Mapped[str] = mapped_column(Text, default="", comment="正文")
     cta: Mapped[str] = mapped_column(Text, default="", comment="结尾CTA")
     full_script: Mapped[str] = mapped_column(Text, comment="完整脚本")
-    source_content_ids: Mapped[dict | None] = mapped_column(JSON, nullable=True, comment="参考内容ID")
-    metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    source_content_ids: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, comment="参考内容ID")
+    extra_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="draft", comment="状态: draft/reviewed/final")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

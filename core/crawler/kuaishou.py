@@ -1,4 +1,5 @@
 """快手爬虫 - 基于GraphQL API"""
+from __future__ import annotations
 
 import json
 from core.crawler.base import BaseCrawler

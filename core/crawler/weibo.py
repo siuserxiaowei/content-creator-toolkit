@@ -1,4 +1,5 @@
 """微博爬虫 - 基于移动端API"""
+from __future__ import annotations
 
 from core.crawler.base import BaseCrawler
 from core.logger import get_logger
@@ -17,6 +18,29 @@ class WeiboCrawler(BaseCrawler):
             "Referer": "https://m.weibo.cn/",
             "X-Requested-With": "XMLHttpRequest",
         })
+
+    async def fetch_user_profile(self, user_id: str, cookie: str = "") -> dict | None:
+        """获取微博用户资料"""
+        url = f"{WEIBO_API}/container/getIndex"
+        params = {"type": "uid", "value": user_id}
+        async with self._get_client(cookie) as client:
+            try:
+                data = await self._request(client, "GET", url, params=params)
+                info = data.get("data", {}).get("userInfo", {})
+                if info:
+                    return {
+                        "name": info.get("screen_name", ""),
+                        "avatar_url": info.get("avatar_hd", ""),
+                        "follower_count": info.get("followers_count", 0),
+                        "following_count": info.get("follow_count", 0),
+                        "description": info.get("description", ""),
+                        "video_count": info.get("statuses_count", 0),
+                        "like_count": 0,
+                    }
+                return None
+            except Exception as e:
+                logger.warning(f"获取微博用户资料失败: {e}")
+                return None
 
     async def fetch_user_posts(self, user_id: str, cookie: str = "", max_count: int = 20) -> list[dict]:
         """获取微博用户最新微博"""

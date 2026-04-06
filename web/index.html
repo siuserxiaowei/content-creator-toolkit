@@ -5,472 +5,839 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>内容创作系统</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                fontFamily: { sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'] },
+                colors: {
+                    brand: { 50:'#f0f4ff', 100:'#dbe4ff', 200:'#bac8ff', 400:'#748ffc', 500:'#4c6ef5', 600:'#4263eb', 700:'#3b5bdb' },
+                },
+            }
+        }
+    }
+    </script>
     <style>
         [v-cloak] { display: none; }
-        .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
-        .fade-enter-from, .fade-leave-to { opacity: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+        .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .fade-move, .fade-enter-active, .fade-leave-active { transition: all 0.3s ease; }
+        .fade-enter-from { opacity: 0; transform: translateY(-8px); }
+        .fade-leave-to { opacity: 0; transform: translateX(40px); }
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+        /* 骨架屏动画 */
+        @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.5 } }
+        .animate-pulse-slow { animation: pulse 2s ease-in-out infinite; }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-[#f8f9fc] min-h-screen">
 <div id="app" v-cloak>
-    <!-- 顶部导航 -->
-    <nav class="bg-white shadow-sm border-b sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-14">
-                <div class="flex items-center space-x-8">
-                    <h1 class="text-lg font-bold text-gray-900">内容创作系统</h1>
-                    <div class="flex space-x-1">
-                        <button v-for="tab in tabs" :key="tab.key"
-                            @click="activeTab = tab.key"
-                            :class="activeTab === tab.key ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'"
-                            class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors">
-                            {{ tab.label }}
+
+    <!-- ===== Toast ===== -->
+    <div class="fixed top-5 left-1/2 -translate-x-1/2 z-[100] space-y-2 pointer-events-none">
+        <transition-group name="fade">
+            <div v-for="t in toasts" :key="t.id"
+                class="px-5 py-3 rounded-xl shadow-lg text-sm text-white pointer-events-auto"
+                :class="{'bg-emerald-500': t.type==='success', 'bg-red-500': t.type==='error', 'bg-brand-600': t.type==='info', 'bg-amber-500': t.type==='loading'}">
+                <span v-if="t.type==='loading'" class="inline-block animate-spin mr-1.5">&#9696;</span>{{ t.msg }}
+            </div>
+        </transition-group>
+    </div>
+
+    <!-- ===== 侧边栏 + 主体布局 ===== -->
+    <div class="flex min-h-screen">
+
+        <!-- 左侧导航 -->
+        <aside class="w-56 bg-white border-r flex flex-col flex-shrink-0 sticky top-0 h-screen">
+            <div class="px-5 py-5 border-b">
+                <h1 class="text-base font-bold text-gray-900 tracking-tight">内容创作系统</h1>
+                <p class="text-[11px] text-gray-400 mt-0.5">KOL监控 &middot; 选题分析 &middot; 脚本生成</p>
+            </div>
+            <nav class="flex-1 py-3 px-3 space-y-0.5">
+                <button v-for="tab in tabs" :key="tab.key" @click="switchTab(tab.key)"
+                    :class="activeTab === tab.key
+                        ? 'bg-brand-50 text-brand-700 font-semibold'
+                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'"
+                    class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm transition-all text-left">
+                    <span class="text-lg leading-none" v-html="tab.icon"></span>
+                    <span>{{ tab.label }}</span>
+                    <span v-if="tab.badge" class="ml-auto text-[10px] bg-brand-500 text-white px-1.5 py-0.5 rounded-full">{{ tab.badge }}</span>
+                </button>
+            </nav>
+            <div class="px-5 py-4 border-t text-[11px] text-gray-400">
+                v0.1.0 &middot; 单人版
+            </div>
+        </aside>
+
+        <!-- 主内容区 -->
+        <div class="flex-1 min-w-0">
+            <!-- 顶栏 -->
+            <header class="sticky top-0 z-40 bg-[#f8f9fc]/80 backdrop-blur-sm border-b border-gray-100 px-8 py-3 flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-gray-800">{{ currentTabLabel }}</h2>
+                <div class="flex items-center space-x-3">
+                    <button @click="refreshAll" class="text-xs text-gray-400 hover:text-brand-600 transition">&#8635; 刷新</button>
+                </div>
+            </header>
+
+            <div class="px-8 py-6">
+
+                <!-- ==================== 首页 ==================== -->
+                <div v-if="activeTab === 'home'" class="space-y-8">
+                    <!-- 大操作卡片 —— 最重要的3个入口 -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                        <div @click="showAddKol = true"
+                            class="group bg-white rounded-2xl border border-gray-100 p-6 cursor-pointer hover:shadow-lg hover:border-brand-200 transition-all duration-200">
+                            <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">&#128100;</div>
+                            <h3 class="font-semibold text-gray-800 mb-1">添加 KOL</h3>
+                            <p class="text-sm text-gray-400 leading-relaxed">填写博主名称和平台ID，开始监控他的内容更新</p>
+                        </div>
+                        <div @click="showSearch = true"
+                            class="group bg-white rounded-2xl border border-gray-100 p-6 cursor-pointer hover:shadow-lg hover:border-brand-200 transition-all duration-200">
+                            <div class="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">&#128269;</div>
+                            <h3 class="font-semibold text-gray-800 mb-1">搜索内容</h3>
+                            <p class="text-sm text-gray-400 leading-relaxed">按关键词搜索各平台热门视频、文章和笔记</p>
+                        </div>
+                        <div @click="showGenScript = true"
+                            class="group bg-white rounded-2xl border border-gray-100 p-6 cursor-pointer hover:shadow-lg hover:border-brand-200 transition-all duration-200">
+                            <div class="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">&#9997;&#65039;</div>
+                            <h3 class="font-semibold text-gray-800 mb-1">生成脚本</h3>
+                            <p class="text-sm text-gray-400 leading-relaxed">输入选题，AI自动生成完整的视频拍摄脚本</p>
+                        </div>
+                    </div>
+
+                    <!-- 统计 -->
+                    <div class="grid grid-cols-4 gap-4">
+                        <div v-for="s in stats" :key="s.label" class="bg-white rounded-xl border border-gray-100 px-5 py-4">
+                            <p class="text-xs text-gray-400 uppercase tracking-wider">{{ s.label }}</p>
+                            <p class="text-2xl font-bold mt-1" :class="s.color">{{ s.value }}</p>
+                        </div>
+                    </div>
+
+                    <!-- 图表区 -->
+                    <div v-if="chartData.platformStats && Object.keys(chartData.platformStats).length" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div class="bg-white rounded-2xl border border-gray-100 p-5">
+                            <h3 class="font-semibold text-sm text-gray-700 mb-3">各平台内容分布</h3>
+                            <div style="height:200px"><canvas ref="platformChart"></canvas></div>
+                        </div>
+                        <div class="bg-white rounded-2xl border border-gray-100 p-5">
+                            <h3 class="font-semibold text-sm text-gray-700 mb-3">最近内容互动对比</h3>
+                            <div style="height:200px"><canvas ref="engagementChart"></canvas></div>
+                        </div>
+                    </div>
+
+                    <!-- 我的KOL快捷操作 -->
+                    <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                        <div class="px-6 py-4 border-b flex items-center justify-between">
+                            <h3 class="font-semibold text-sm text-gray-700">我的KOL</h3>
+                            <button @click="showAddKol = true" class="text-xs text-brand-600 hover:text-brand-700 font-medium">+ 添加</button>
+                        </div>
+                        <div v-if="kols.length" class="divide-y">
+                            <div v-for="kol in kols" :key="kol.id"
+                                class="px-6 py-3.5 flex items-center justify-between hover:bg-gray-50/50 transition">
+                                <div class="flex items-center space-x-3 min-w-0">
+                                    <span class="px-2 py-0.5 rounded text-[11px] font-medium flex-shrink-0" :class="pCls(kol.platform)">{{ pName(kol.platform) }}</span>
+                                    <span class="text-sm font-medium text-gray-800 truncate">{{ kol.name }}</span>
+                                    <span v-if="kol.tags" class="text-xs text-gray-400 truncate hidden md:inline">{{ kol.tags }}</span>
+                                </div>
+                                <div class="flex items-center space-x-2 flex-shrink-0">
+                                    <button @click="crawlKol(kol)"
+                                        class="px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-50 text-brand-700 hover:bg-brand-100 transition">
+                                        抓取内容
+                                    </button>
+                                    <button @click="viewKolContents(kol)"
+                                        class="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-50 text-gray-600 hover:bg-gray-100 transition">
+                                        查看
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else class="px-6 py-10 text-center">
+                            <p class="text-gray-400 text-sm mb-3">还没有添加KOL</p>
+                            <button @click="showAddKol = true" class="text-sm text-brand-600 font-medium hover:text-brand-700">+ 添加第一个 KOL</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== KOL管理 ==================== -->
+                <div v-if="activeTab === 'kols'" class="space-y-5">
+                    <div class="flex justify-between items-center">
+                        <div></div>
+                        <button @click="showAddKol = true" class="bg-brand-600 text-white px-5 py-2 rounded-xl text-sm hover:bg-brand-700 transition font-medium shadow-sm">
+                            + 添加KOL
                         </button>
                     </div>
-                </div>
-                <div class="flex items-center space-x-3">
-                    <span class="text-xs text-gray-400">v0.1.0</span>
-                    <button @click="refreshAll" class="text-sm text-blue-600 hover:text-blue-800">刷新</button>
-                </div>
-            </div>
-        </div>
-    </nav>
 
-    <main class="max-w-7xl mx-auto px-4 py-6">
-        <!-- 仪表盘 -->
-        <div v-if="activeTab === 'dashboard'" class="space-y-6">
-            <div class="grid grid-cols-4 gap-4">
-                <div v-for="stat in dashboardStats" :key="stat.label"
-                    class="bg-white rounded-lg shadow-sm p-5 border">
-                    <p class="text-sm text-gray-500">{{ stat.label }}</p>
-                    <p class="text-2xl font-bold mt-1" :class="stat.color">{{ stat.value }}</p>
-                </div>
-            </div>
-            <div class="bg-white rounded-lg shadow-sm border p-5">
-                <h3 class="font-semibold mb-3">最近监控日志</h3>
-                <div class="space-y-2">
-                    <div v-for="log in monitorLogs.slice(0, 10)" :key="log.id"
-                        class="flex items-center justify-between py-2 border-b last:border-0 text-sm">
-                        <span class="text-gray-600">KOL #{{ log.kol_id }}</span>
-                        <span :class="{
-                            'text-green-600': log.status === 'changed',
-                            'text-gray-400': log.status === 'unchanged',
-                            'text-red-500': log.status === 'failed'
-                        }">{{ log.message }}</span>
-                        <span class="text-gray-400 text-xs">{{ formatTime(log.checked_at) }}</span>
+                    <div v-if="!kols.length" class="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-16 text-center">
+                        <div class="text-5xl mb-4 opacity-40">&#128100;</div>
+                        <h3 class="text-base font-semibold text-gray-600 mb-2">添加你想监控的博主</h3>
+                        <p class="text-sm text-gray-400 mb-6">系统会自动抓取他们的最新内容</p>
+                        <button @click="showAddKol = true" class="bg-brand-600 text-white px-6 py-2.5 rounded-xl hover:bg-brand-700 transition font-medium">
+                            + 开始添加
+                        </button>
                     </div>
-                    <p v-if="!monitorLogs.length" class="text-gray-400 text-sm">暂无日志</p>
-                </div>
-            </div>
-        </div>
 
-        <!-- KOL管理 -->
-        <div v-if="activeTab === 'kols'" class="space-y-4">
-            <div class="flex justify-between items-center">
-                <h2 class="text-lg font-semibold">KOL管理</h2>
-                <button @click="showAddKol = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
-                    添加KOL
-                </button>
-            </div>
-            <div class="bg-white rounded-lg shadow-sm border overflow-hidden">
-                <table class="w-full text-sm">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="text-left px-4 py-3 font-medium text-gray-600">名称</th>
-                            <th class="text-left px-4 py-3 font-medium text-gray-600">平台</th>
-                            <th class="text-left px-4 py-3 font-medium text-gray-600">标签</th>
-                            <th class="text-center px-4 py-3 font-medium text-gray-600">监控</th>
-                            <th class="text-left px-4 py-3 font-medium text-gray-600">上次检查</th>
-                            <th class="text-center px-4 py-3 font-medium text-gray-600">操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="kol in kols" :key="kol.id" class="border-t hover:bg-gray-50">
-                            <td class="px-4 py-3 font-medium">{{ kol.name }}</td>
-                            <td class="px-4 py-3">
-                                <span class="px-2 py-0.5 rounded-full text-xs"
-                                    :class="platformClass(kol.platform)">{{ kol.platform }}</span>
-                            </td>
-                            <td class="px-4 py-3 text-gray-500">{{ kol.tags }}</td>
-                            <td class="px-4 py-3 text-center">
-                                <span :class="kol.is_monitoring ? 'text-green-500' : 'text-gray-400'">
-                                    {{ kol.is_monitoring ? '●' : '○' }}
+                    <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        <div v-for="kol in kols" :key="kol.id"
+                            class="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-md transition-all duration-200">
+                            <div class="flex justify-between items-start mb-3">
+                                <div class="flex items-start space-x-3">
+                                    <img v-if="kol.avatar_url" :src="kol.avatar_url" class="w-11 h-11 rounded-full object-cover flex-shrink-0 border" @error="$event.target.style.display='none'">
+                                    <div v-else class="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center text-gray-300 text-lg flex-shrink-0">&#128100;</div>
+                                    <div>
+                                        <h3 class="font-semibold text-base text-gray-800">{{ kol.name }}</h3>
+                                        <div class="flex items-center space-x-2 mt-0.5">
+                                            <span class="px-2 py-0.5 rounded text-[11px] font-medium" :class="pCls(kol.platform)">{{ pName(kol.platform) }}</span>
+                                            <span v-if="kol.follower_count" class="text-xs text-gray-500">{{ fmtNum(kol.follower_count) }} 粉丝</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <span :class="kol.is_monitoring ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400'"
+                                    class="px-2 py-0.5 rounded-full text-[11px] font-medium flex-shrink-0">
+                                    {{ kol.is_monitoring ? '监控中' : '已暂停' }}
                                 </span>
-                            </td>
-                            <td class="px-4 py-3 text-gray-400 text-xs">{{ formatTime(kol.last_checked_at) }}</td>
-                            <td class="px-4 py-3 text-center space-x-2">
-                                <button @click="checkKol(kol.id)" class="text-blue-600 hover:text-blue-800 text-xs">检查</button>
-                                <button @click="deleteKol(kol.id)" class="text-red-500 hover:text-red-700 text-xs">删除</button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-                <p v-if="!kols.length" class="p-8 text-center text-gray-400">暂无KOL，点击右上角添加</p>
-            </div>
-        </div>
-
-        <!-- 内容列表 -->
-        <div v-if="activeTab === 'contents'" class="space-y-4">
-            <div class="flex justify-between items-center">
-                <h2 class="text-lg font-semibold">内容列表</h2>
-                <div class="flex space-x-2">
-                    <select v-model="contentFilter.platform" @change="loadContents"
-                        class="border rounded-lg px-3 py-1.5 text-sm">
-                        <option value="">全部平台</option>
-                        <option v-for="p in platforms" :value="p">{{ p }}</option>
-                    </select>
-                </div>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div v-for="item in contents" :key="item.id"
-                    class="bg-white rounded-lg shadow-sm border overflow-hidden hover:shadow-md transition-shadow">
-                    <div class="aspect-video bg-gray-100 relative" v-if="item.cover_url">
-                        <img :src="item.cover_url" class="w-full h-full object-cover" loading="lazy"
-                            @error="$event.target.style.display='none'">
-                        <span class="absolute top-2 left-2 px-2 py-0.5 bg-black/60 text-white text-xs rounded">
-                            {{ item.content_type }}
-                        </span>
-                    </div>
-                    <div class="p-4">
-                        <h3 class="font-medium text-sm line-clamp-2">{{ item.title || '无标题' }}</h3>
-                        <div class="flex items-center justify-between mt-3 text-xs text-gray-400">
-                            <div class="flex space-x-3">
-                                <span>赞 {{ item.like_count }}</span>
-                                <span>评 {{ item.comment_count }}</span>
-                                <span>播 {{ item.view_count }}</span>
                             </div>
-                            <span :class="platformClass(item.platform)" class="px-1.5 py-0.5 rounded text-xs">
-                                {{ item.platform }}
+                            <p v-if="kol.description" class="text-xs text-gray-400 mb-2 line-clamp-2">{{ kol.description }}</p>
+                            <div class="flex items-center justify-between text-xs text-gray-400 mb-3">
+                                <span v-if="kol.tags">{{ kol.tags }}</span>
+                                <span>检查: {{ fmtTime(kol.last_checked_at) }}</span>
+                            </div>
+                            <!-- 三个主要操作 -->
+                            <div class="grid grid-cols-3 gap-2">
+                                <button @click="crawlKol(kol)"
+                                    class="py-2.5 rounded-xl text-xs font-medium bg-brand-50 text-brand-700 hover:bg-brand-100 transition text-center">
+                                    &#128229; 抓取
+                                </button>
+                                <button @click="analyzeKol(kol)"
+                                    class="py-2.5 rounded-xl text-xs font-medium bg-purple-50 text-purple-700 hover:bg-purple-100 transition text-center">
+                                    &#128300; 分析
+                                </button>
+                                <button @click="viewKolContents(kol)"
+                                    class="py-2.5 rounded-xl text-xs font-medium bg-gray-50 text-gray-600 hover:bg-gray-100 transition text-center">
+                                    &#128196; 查看
+                                </button>
+                            </div>
+                            <div class="flex justify-end space-x-3 mt-3 pt-3 border-t border-gray-50">
+                                <button @click="refreshKolProfile(kol)" class="text-[11px] text-gray-400 hover:text-brand-600 transition">刷新资料</button>
+                                <button @click="toggleMonitor(kol)" class="text-[11px] text-gray-400 hover:text-amber-600 transition">
+                                    {{ kol.is_monitoring ? '暂停监控' : '启用监控' }}
+                                </button>
+                                <button @click="deleteKol(kol.id)" class="text-[11px] text-gray-400 hover:text-red-500 transition">删除</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== 内容列表 ==================== -->
+                <div v-if="activeTab === 'contents'" class="space-y-5">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex items-center space-x-2">
+                            <span v-if="cFilter.kol_name" class="bg-brand-50 text-brand-700 text-xs font-medium px-3 py-1 rounded-full flex items-center space-x-1">
+                                <span>{{ cFilter.kol_name }}</span>
+                                <button @click="cFilter.kol_id=''; cFilter.kol_name=''; loadContents()" class="hover:text-red-500 ml-1">&#10005;</button>
                             </span>
                         </div>
-                        <div class="flex space-x-2 mt-3">
-                            <button @click="analyzeContent(item.id)"
-                                :class="item.is_analyzed ? 'text-gray-400' : 'text-blue-600 hover:text-blue-800'"
-                                class="text-xs">
-                                {{ item.is_analyzed ? '已分析' : '分析选题' }}
+                        <div class="flex items-center space-x-2">
+                            <select v-model="cFilter.platform" @change="loadContents" class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white">
+                                <option value="">全部平台</option>
+                                <option v-for="p in platforms" :value="p">{{ pName(p) }}</option>
+                            </select>
+                            <button @click="showSearch = true" class="bg-brand-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-brand-700 transition font-medium">
+                                &#128269; 搜索抓取
                             </button>
-                            <a :href="item.url" target="_blank" class="text-xs text-gray-500 hover:text-gray-700">查看原文</a>
+                        </div>
+                    </div>
+
+                    <div v-if="!contents.length" class="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-16 text-center">
+                        <div class="text-5xl mb-4 opacity-40">&#128196;</div>
+                        <h3 class="text-base font-semibold text-gray-600 mb-2">暂无内容</h3>
+                        <p class="text-sm text-gray-400 mb-5">在KOL管理里点「抓取」，或用搜索功能获取内容</p>
+                        <div class="flex justify-center space-x-3">
+                            <button @click="switchTab('kols')" class="px-4 py-2 rounded-lg text-sm bg-brand-600 text-white hover:bg-brand-700 transition">去KOL管理</button>
+                            <button @click="showSearch = true" class="px-4 py-2 rounded-lg text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 transition">搜索内容</button>
+                        </div>
+                    </div>
+
+                    <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        <div v-for="item in contents" :key="item.id"
+                            class="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-all duration-200">
+                            <div class="aspect-[16/9] bg-gray-100 relative">
+                                <img v-if="item.cover_url" :src="item.cover_url" class="w-full h-full object-cover" loading="lazy" @error="$event.target.style.display='none'">
+                                <div v-else class="w-full h-full flex items-center justify-center text-gray-200 text-4xl">&#127910;</div>
+                                <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/50 to-transparent px-3 py-2 flex justify-between items-end">
+                                    <span class="text-white text-[11px]">{{ item.content_type }}</span>
+                                    <span class="px-1.5 py-0.5 rounded text-[10px] font-medium" :class="pCls(item.platform)">{{ pName(item.platform) }}</span>
+                                </div>
+                            </div>
+                            <div class="p-4">
+                                <h3 @click="openDetail(item)" class="font-medium text-sm line-clamp-2 text-gray-800 min-h-[2.5rem] leading-snug cursor-pointer hover:text-brand-600 transition">{{ item.title || '无标题' }}</h3>
+                                <div class="flex items-center space-x-4 mt-2 text-xs text-gray-400">
+                                    <span>&#10084;&#65039; {{ fmtNum(item.like_count) }}</span>
+                                    <span>&#128172; {{ fmtNum(item.comment_count) }}</span>
+                                    <span>&#9655; {{ fmtNum(item.view_count) }}</span>
+                                </div>
+                                <div class="flex items-center space-x-2 mt-3 pt-3 border-t border-gray-50">
+                                    <button v-if="!item.is_analyzed" @click="analyzeContent(item.id)"
+                                        class="flex-1 py-1.5 rounded-lg text-xs font-medium bg-purple-50 text-purple-700 hover:bg-purple-100 transition text-center">
+                                        &#128300; 分析选题
+                                    </button>
+                                    <span v-else class="flex-1 py-1.5 rounded-lg text-xs text-emerald-600 bg-emerald-50 text-center font-medium">&#10003; 已分析</span>
+                                    <button @click="crawlComments(item)"
+                                        class="py-1.5 px-3 rounded-lg text-xs font-medium bg-gray-50 text-gray-600 hover:bg-gray-100 transition">
+                                        &#128172; 抓评论
+                                    </button>
+                                    <a :href="item.url" target="_blank"
+                                        class="py-1.5 px-3 rounded-lg text-xs text-gray-400 hover:bg-gray-50 transition">&#128279;</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 分页 -->
+                    <div v-if="cTotal > cPageSize" class="flex justify-center items-center space-x-4 pt-2">
+                        <button @click="cPage > 1 && (cPage--, loadContents())" :disabled="cPage <= 1"
+                            class="px-4 py-1.5 border rounded-lg text-sm disabled:opacity-30 hover:bg-gray-50 transition">上一页</button>
+                        <span class="text-sm text-gray-400">{{ cPage }} / {{ Math.ceil(cTotal / cPageSize) }}</span>
+                        <button @click="cPage < Math.ceil(cTotal / cPageSize) && (cPage++, loadContents())"
+                            :disabled="cPage >= Math.ceil(cTotal / cPageSize)"
+                            class="px-4 py-1.5 border rounded-lg text-sm disabled:opacity-30 hover:bg-gray-50 transition">下一页</button>
+                    </div>
+                </div>
+
+                <!-- ==================== 选题分析 ==================== -->
+                <div v-if="activeTab === 'analysis'" class="space-y-5">
+                    <div v-if="!trends.length" class="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-16 text-center">
+                        <div class="text-5xl mb-4 opacity-40">&#128202;</div>
+                        <h3 class="text-base font-semibold text-gray-600 mb-2">暂无分析数据</h3>
+                        <p class="text-sm text-gray-400">先抓取内容，再点「分析选题」按钮</p>
+                    </div>
+                    <div v-else class="space-y-4">
+                        <div v-for="(t, i) in trends" :key="t.content_id"
+                            class="bg-white rounded-2xl border border-gray-100 p-6 hover:shadow-md transition-all duration-200">
+                            <div class="flex justify-between items-start">
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-xl font-bold text-gray-200">#{{ i+1 }}</span>
+                                        <h3 class="font-medium text-gray-800 truncate">{{ t.title }}</h3>
+                                    </div>
+                                    <div class="flex flex-wrap gap-1.5 mt-2">
+                                        <span :class="pCls(t.platform)" class="px-2 py-0.5 rounded text-[11px] font-medium">{{ pName(t.platform) }}</span>
+                                        <span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-[11px]">{{ t.topic_category }}</span>
+                                        <span v-for="kw in t.topic_keywords.split(',').slice(0,3)" :key="kw"
+                                            class="bg-brand-50 text-brand-600 px-2 py-0.5 rounded text-[11px]">{{ kw }}</span>
+                                    </div>
+                                </div>
+                                <div class="flex-shrink-0 ml-4 flex space-x-4">
+                                    <div class="text-center">
+                                        <div class="text-2xl font-bold text-amber-500">{{ t.engagement_score }}</div>
+                                        <div class="text-[10px] text-gray-400">互动</div>
+                                    </div>
+                                    <div class="text-center">
+                                        <div class="text-2xl font-bold text-emerald-500">{{ t.replicability_score }}</div>
+                                        <div class="text-[10px] text-gray-400">可复制</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div v-if="t.why_popular" class="mt-4 text-sm text-gray-600 bg-amber-50/50 p-3 rounded-xl">
+                                <strong class="text-amber-700">为什么火:</strong> {{ t.why_popular }}
+                            </div>
+                            <div v-if="t.replication_suggestions" class="mt-2 text-sm text-brand-700 bg-brand-50/50 p-3 rounded-xl">
+                                <strong>怎么抄:</strong> {{ t.replication_suggestions }}
+                            </div>
+                            <div class="mt-4">
+                                <button @click="generateFromTrend(t)"
+                                    class="bg-emerald-500 text-white px-5 py-2 rounded-xl text-sm hover:bg-emerald-600 transition font-medium shadow-sm">
+                                    &#9997;&#65039; 用这个选题生成脚本
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-            <p v-if="!contents.length" class="text-center text-gray-400 py-12">暂无内容</p>
-        </div>
 
-        <!-- 选题分析 -->
-        <div v-if="activeTab === 'analysis'" class="space-y-4">
-            <h2 class="text-lg font-semibold">选题趋势（按可复制性排序）</h2>
-            <div class="space-y-3">
-                <div v-for="trend in trends" :key="trend.content_id"
-                    class="bg-white rounded-lg shadow-sm border p-5">
-                    <div class="flex justify-between items-start">
-                        <div class="flex-1">
-                            <h3 class="font-medium">{{ trend.title }}</h3>
-                            <div class="flex items-center space-x-3 mt-2 text-xs">
-                                <span :class="platformClass(trend.platform)" class="px-2 py-0.5 rounded">{{ trend.platform }}</span>
-                                <span class="text-gray-500">分类: {{ trend.topic_category }}</span>
-                                <span class="text-gray-500">关键词: {{ trend.topic_keywords }}</span>
-                            </div>
-                        </div>
-                        <div class="text-right ml-4 space-y-1">
-                            <div class="text-sm">互动 <span class="font-bold text-orange-500">{{ trend.engagement_score }}</span></div>
-                            <div class="text-sm">可复制 <span class="font-bold text-green-600">{{ trend.replicability_score }}</span></div>
-                        </div>
-                    </div>
-                    <div class="mt-3 text-sm text-gray-600" v-if="trend.why_popular">
-                        <strong>火爆原因:</strong> {{ trend.why_popular }}
-                    </div>
-                    <div class="mt-1 text-sm text-blue-600" v-if="trend.replication_suggestions">
-                        <strong>复制建议:</strong> {{ trend.replication_suggestions }}
-                    </div>
-                    <div class="mt-2">
-                        <button @click="generateFromTrend(trend)"
-                            class="text-xs bg-green-50 text-green-700 px-3 py-1 rounded hover:bg-green-100">
-                            根据此选题生成脚本
+                <!-- ==================== 视频脚本 ==================== -->
+                <div v-if="activeTab === 'scripts'" class="space-y-5">
+                    <div class="flex justify-end">
+                        <button @click="showGenScript = true"
+                            class="bg-emerald-500 text-white px-5 py-2 rounded-xl text-sm hover:bg-emerald-600 transition font-medium shadow-sm">
+                            &#9997;&#65039; 生成新脚本
                         </button>
                     </div>
-                </div>
-                <p v-if="!trends.length" class="text-center text-gray-400 py-12">暂无分析数据</p>
-            </div>
-        </div>
 
-        <!-- 脚本生成 -->
-        <div v-if="activeTab === 'scripts'" class="space-y-4">
-            <div class="flex justify-between items-center">
-                <h2 class="text-lg font-semibold">视频脚本</h2>
-                <button @click="showGenScript = true" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700">
-                    生成新脚本
-                </button>
-            </div>
-            <div class="space-y-4">
-                <div v-for="script in scripts" :key="script.id"
-                    class="bg-white rounded-lg shadow-sm border p-5">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <h3 class="font-semibold text-lg">{{ script.title }}</h3>
-                            <div class="flex space-x-3 mt-1 text-xs text-gray-500">
-                                <span>选题: {{ script.topic }}</span>
-                                <span>平台: {{ script.target_platform }}</span>
-                                <span>时长: {{ script.target_duration }}s</span>
+                    <div v-if="!scripts.length" class="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-16 text-center">
+                        <div class="text-5xl mb-4 opacity-40">&#128221;</div>
+                        <h3 class="text-base font-semibold text-gray-600 mb-2">还没有脚本</h3>
+                        <p class="text-sm text-gray-400 mb-5">输入一个选题，AI帮你写视频脚本</p>
+                        <button @click="showGenScript = true" class="bg-emerald-500 text-white px-6 py-2.5 rounded-xl hover:bg-emerald-600 transition font-medium">
+                            &#9997;&#65039; 生成第一个
+                        </button>
+                    </div>
+
+                    <div v-else class="space-y-5">
+                        <div v-for="s in scripts" :key="s.id" class="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                            <div class="p-6 pb-4">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <h3 class="font-semibold text-lg text-gray-800">{{ s.title }}</h3>
+                                        <div class="flex items-center space-x-3 mt-1 text-xs text-gray-400">
+                                            <span :class="pCls(s.target_platform)" class="px-2 py-0.5 rounded font-medium">{{ pName(s.target_platform) }}</span>
+                                            <span>{{ s.target_duration }}秒</span>
+                                            <span>{{ s.topic }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="px-6 pb-6 space-y-3">
+                                <div class="bg-red-50/70 p-4 rounded-xl">
+                                    <p class="text-[11px] text-red-400 font-medium mb-1 uppercase tracking-wider">Hook &middot; 前3秒</p>
+                                    <p class="text-sm text-gray-800 leading-relaxed">{{ s.hook }}</p>
+                                </div>
+                                <details class="bg-gray-50/70 rounded-xl border border-gray-100">
+                                    <summary class="p-4 cursor-pointer text-sm font-medium text-gray-600 hover:text-gray-800 transition">
+                                        &#128196; 展开正文
+                                    </summary>
+                                    <div class="px-4 pb-4 whitespace-pre-line text-sm text-gray-700 leading-relaxed">{{ s.body }}</div>
+                                </details>
+                                <div class="bg-brand-50/50 p-4 rounded-xl">
+                                    <p class="text-[11px] text-brand-400 font-medium mb-1 uppercase tracking-wider">CTA &middot; 结尾</p>
+                                    <p class="text-sm text-gray-800 leading-relaxed">{{ s.cta }}</p>
+                                </div>
+                            </div>
+                            <div class="px-6 pb-4 flex items-center space-x-3 border-t pt-3">
+                                <button @click="copyScript(s)" class="text-xs text-brand-600 hover:text-brand-700 font-medium transition">&#128203; 复制全文</button>
+                                <button @click="deleteScript(s.id)" class="text-xs text-gray-400 hover:text-red-500 transition">&#128465; 删除</button>
                             </div>
                         </div>
-                        <span class="px-2 py-1 rounded text-xs"
-                            :class="{
-                                'bg-yellow-50 text-yellow-700': script.status === 'draft',
-                                'bg-blue-50 text-blue-700': script.status === 'reviewed',
-                                'bg-green-50 text-green-700': script.status === 'final'
-                            }">
-                            {{ {draft:'草稿',reviewed:'已审',final:'定稿'}[script.status] }}
-                        </span>
-                    </div>
-                    <div class="mt-4 space-y-3 text-sm">
-                        <div class="bg-red-50 p-3 rounded">
-                            <strong class="text-red-700">Hook:</strong>
-                            <p class="mt-1">{{ script.hook }}</p>
-                        </div>
-                        <div class="bg-gray-50 p-3 rounded">
-                            <strong>正文:</strong>
-                            <p class="mt-1 whitespace-pre-line">{{ script.body }}</p>
-                        </div>
-                        <div class="bg-blue-50 p-3 rounded">
-                            <strong class="text-blue-700">CTA:</strong>
-                            <p class="mt-1">{{ script.cta }}</p>
-                        </div>
-                    </div>
-                    <div class="flex space-x-2 mt-3">
-                        <button @click="copyScript(script)" class="text-xs text-blue-600 hover:text-blue-800">复制全文</button>
-                        <button @click="deleteScript(script.id)" class="text-xs text-red-500 hover:text-red-700">删除</button>
                     </div>
                 </div>
-                <p v-if="!scripts.length" class="text-center text-gray-400 py-12">暂无脚本</p>
-            </div>
-        </div>
-    </main>
 
-    <!-- 添加KOL弹窗 -->
-    <div v-if="showAddKol" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showAddKol = false">
-        <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
-            <h3 class="text-lg font-semibold mb-4">添加KOL</h3>
-            <div class="space-y-3">
-                <div>
-                    <label class="text-sm text-gray-600">名称</label>
-                    <input v-model="newKol.name" class="w-full border rounded-lg px-3 py-2 mt-1 text-sm" placeholder="博主名称">
-                </div>
-                <div>
-                    <label class="text-sm text-gray-600">平台</label>
-                    <select v-model="newKol.platform" class="w-full border rounded-lg px-3 py-2 mt-1 text-sm">
-                        <option v-for="p in platforms" :value="p">{{ p }}</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="text-sm text-gray-600">平台用户ID</label>
-                    <input v-model="newKol.platform_uid" class="w-full border rounded-lg px-3 py-2 mt-1 text-sm" placeholder="用户ID">
-                </div>
-                <div>
-                    <label class="text-sm text-gray-600">主页URL</label>
-                    <input v-model="newKol.homepage_url" class="w-full border rounded-lg px-3 py-2 mt-1 text-sm" placeholder="https://...">
-                </div>
-                <div>
-                    <label class="text-sm text-gray-600">标签（逗号分隔）</label>
-                    <input v-model="newKol.tags" class="w-full border rounded-lg px-3 py-2 mt-1 text-sm" placeholder="美妆,护肤">
-                </div>
-                <div>
-                    <label class="text-sm text-gray-600">检查间隔（秒）</label>
-                    <input v-model.number="newKol.check_interval" type="number" class="w-full border rounded-lg px-3 py-2 mt-1 text-sm">
-                </div>
-            </div>
-            <div class="flex justify-end space-x-3 mt-5">
-                <button @click="showAddKol = false" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">取消</button>
-                <button @click="addKol" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">添加</button>
             </div>
         </div>
     </div>
 
-    <!-- 生成脚本弹窗 -->
-    <div v-if="showGenScript" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showGenScript = false">
-        <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
-            <h3 class="text-lg font-semibold mb-4">生成视频脚本</h3>
-            <div class="space-y-3">
+    <!-- ===== 弹窗: 添加KOL ===== -->
+    <div v-if="showAddKol" class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="showAddKol = false">
+        <div class="bg-white rounded-2xl shadow-2xl p-7 w-full max-w-md">
+            <h3 class="text-lg font-semibold text-gray-800 mb-5">添加 KOL</h3>
+            <div class="space-y-4">
                 <div>
-                    <label class="text-sm text-gray-600">选题</label>
-                    <input v-model="newScript.topic" class="w-full border rounded-lg px-3 py-2 mt-1 text-sm" placeholder="输入选题">
+                    <label class="text-sm text-gray-600 font-medium">博主名称</label>
+                    <input v-model="newKol.name" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 mt-1 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 outline-none transition" placeholder="如: 何同学">
                 </div>
                 <div>
-                    <label class="text-sm text-gray-600">目标平台</label>
-                    <select v-model="newScript.target_platform" class="w-full border rounded-lg px-3 py-2 mt-1 text-sm">
-                        <option v-for="p in platforms" :value="p">{{ p }}</option>
+                    <label class="text-sm text-gray-600 font-medium">平台</label>
+                    <select v-model="newKol.platform" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 mt-1 text-sm focus:ring-2 focus:ring-brand-200 outline-none">
+                        <option v-for="p in platforms" :value="p">{{ pName(p) }}</option>
                     </select>
                 </div>
                 <div>
-                    <label class="text-sm text-gray-600">目标时长（秒）</label>
-                    <input v-model.number="newScript.target_duration" type="number" class="w-full border rounded-lg px-3 py-2 mt-1 text-sm">
+                    <label class="text-sm text-gray-600 font-medium">用户ID</label>
+                    <input v-model="newKol.platform_uid" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 mt-1 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 outline-none transition"
+                        :placeholder="uidHint">
+                    <p class="text-[11px] text-gray-400 mt-1">{{ uidHelp }}</p>
                 </div>
                 <div>
-                    <label class="text-sm text-gray-600">风格参考（可选）</label>
-                    <input v-model="newScript.style_reference" class="w-full border rounded-lg px-3 py-2 mt-1 text-sm" placeholder="参考某个KOL的风格">
-                </div>
-                <div>
-                    <label class="text-sm text-gray-600">额外要求（可选）</label>
-                    <textarea v-model="newScript.additional_instructions" class="w-full border rounded-lg px-3 py-2 mt-1 text-sm" rows="3" placeholder="其他特殊要求"></textarea>
+                    <label class="text-sm text-gray-600 font-medium">标签 <span class="text-gray-400 font-normal">(可选)</span></label>
+                    <input v-model="newKol.tags" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 mt-1 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 outline-none transition" placeholder="如: 科技,数码">
                 </div>
             </div>
-            <div class="flex justify-end space-x-3 mt-5">
-                <button @click="showGenScript = false" class="px-4 py-2 text-sm text-gray-600">取消</button>
-                <button @click="genScript" :disabled="generating" class="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">
+            <div class="flex justify-end space-x-3 mt-6">
+                <button @click="showAddKol = false" class="px-5 py-2 text-sm text-gray-500 hover:text-gray-700 transition">取消</button>
+                <button @click="addKol" :disabled="!newKol.name || !newKol.platform_uid"
+                    class="px-6 py-2 text-sm bg-brand-600 text-white rounded-xl hover:bg-brand-700 transition disabled:opacity-40 font-medium shadow-sm">
+                    添加
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 弹窗: 搜索 ===== -->
+    <div v-if="showSearch" class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="showSearch = false">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
+            <div class="p-6 border-b">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">搜索平台内容</h3>
+                <div class="flex space-x-2">
+                    <select v-model="searchForm.platform" class="border border-gray-200 rounded-xl px-3 py-2.5 text-sm w-28 bg-white">
+                        <option v-for="p in platforms" :value="p">{{ pName(p) }}</option>
+                    </select>
+                    <input v-model="searchForm.keyword" @keyup.enter="doSearch"
+                        class="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 outline-none transition"
+                        placeholder="输入关键词...">
+                    <button @click="doSearch" :disabled="searching || !searchForm.keyword"
+                        class="bg-brand-600 text-white px-6 py-2.5 rounded-xl text-sm hover:bg-brand-700 transition disabled:opacity-40 font-medium">
+                        {{ searching ? '...' : '搜索' }}
+                    </button>
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto p-6">
+                <div v-if="searchResults.length" class="space-y-2">
+                    <div v-for="r in searchResults" :key="r.content_id"
+                        class="flex items-start space-x-3 p-3 rounded-xl hover:bg-gray-50 transition">
+                        <img v-if="r.cover_url" :src="r.cover_url" class="w-24 h-16 object-cover rounded-lg flex-shrink-0" @error="$event.target.style.display='none'">
+                        <div class="flex-1 min-w-0">
+                            <h4 class="text-sm font-medium text-gray-800 line-clamp-2">{{ r.title || '无标题' }}</h4>
+                            <div class="flex space-x-3 mt-1 text-xs text-gray-400">
+                                <span>&#10084;&#65039; {{ fmtNum(r.like_count) }}</span>
+                                <span>&#128172; {{ fmtNum(r.comment_count) }}</span>
+                                <span>&#9655; {{ fmtNum(r.view_count) }}</span>
+                            </div>
+                        </div>
+                        <div class="flex flex-col space-y-1 flex-shrink-0">
+                            <button @click="saveSearchItem(r)" class="text-[11px] text-brand-600 hover:text-brand-700 font-medium px-2 py-1 rounded hover:bg-brand-50 transition">
+                                &#128190; 保存
+                            </button>
+                            <a v-if="r.url" :href="r.url" target="_blank" class="text-[11px] text-gray-400 hover:text-brand-600 px-2 py-1">&#128279;</a>
+                        </div>
+                    </div>
+                </div>
+                <div v-else class="text-center py-16 text-gray-400">
+                    <div class="text-4xl mb-3 opacity-40">&#128269;</div>
+                    <p class="text-sm">{{ searchDone ? '没有结果，换个关键词试试' : '输入关键词开始搜索' }}</p>
+                </div>
+            </div>
+            <div class="p-4 border-t flex justify-end">
+                <button @click="showSearch = false" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 弹窗: 生成脚本 ===== -->
+    <div v-if="showGenScript" class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="showGenScript = false">
+        <div class="bg-white rounded-2xl shadow-2xl p-7 w-full max-w-md">
+            <h3 class="text-lg font-semibold text-gray-800 mb-5">&#9997;&#65039; 生成视频脚本</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-sm text-gray-600 font-medium">选题</label>
+                    <input v-model="newScript.topic" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 mt-1 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 outline-none transition"
+                        placeholder="如: 5个提高效率的AI工具">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-sm text-gray-600 font-medium">目标平台</label>
+                        <select v-model="newScript.target_platform" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 mt-1 text-sm">
+                            <option v-for="p in platforms" :value="p">{{ pName(p) }}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-600 font-medium">时长</label>
+                        <select v-model="newScript.target_duration" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 mt-1 text-sm">
+                            <option :value="30">30秒</option><option :value="60">1分钟</option>
+                            <option :value="120">2分钟</option><option :value="300">5分钟</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-sm text-gray-600 font-medium">风格参考 <span class="text-gray-400 font-normal">(可选)</span></label>
+                    <input v-model="newScript.style_reference" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 mt-1 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 outline-none transition"
+                        placeholder="如: 何同学风格">
+                </div>
+                <div>
+                    <label class="text-sm text-gray-600 font-medium">额外要求 <span class="text-gray-400 font-normal">(可选)</span></label>
+                    <textarea v-model="newScript.additional_instructions"
+                        class="w-full border border-gray-200 rounded-xl px-4 py-2.5 mt-1 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 outline-none transition" rows="2"
+                        placeholder="如: 用悬念式开头"></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button @click="showGenScript = false" class="px-5 py-2 text-sm text-gray-500 transition">取消</button>
+                <button @click="genScript" :disabled="generating || !newScript.topic"
+                    class="px-6 py-2 text-sm bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 disabled:opacity-40 transition font-medium shadow-sm">
                     {{ generating ? '生成中...' : '生成' }}
                 </button>
             </div>
         </div>
     </div>
+
+    <!-- ===== 弹窗: 内容详情 ===== -->
+    <div v-if="detailItem" class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="detailItem = null">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+            <div class="p-6 border-b flex-shrink-0">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1 min-w-0 pr-4">
+                        <h3 class="font-semibold text-lg text-gray-800">{{ detailItem.title || '无标题' }}</h3>
+                        <div class="flex items-center space-x-3 mt-2 text-xs">
+                            <span :class="pCls(detailItem.platform)" class="px-2 py-0.5 rounded font-medium">{{ pName(detailItem.platform) }}</span>
+                            <span v-if="detailItem.kol_name" class="text-gray-500">{{ detailItem.kol_name }}</span>
+                            <span class="text-gray-400">{{ detailItem.content_type }}</span>
+                        </div>
+                    </div>
+                    <button @click="detailItem = null" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+                </div>
+                <!-- 数据指标 -->
+                <div class="grid grid-cols-4 gap-3 mt-4">
+                    <div class="text-center bg-gray-50 rounded-xl py-2">
+                        <div class="text-lg font-bold text-red-500">{{ fmtNum(detailItem.like_count) }}</div>
+                        <div class="text-[10px] text-gray-400">点赞</div>
+                    </div>
+                    <div class="text-center bg-gray-50 rounded-xl py-2">
+                        <div class="text-lg font-bold text-blue-500">{{ fmtNum(detailItem.comment_count) }}</div>
+                        <div class="text-[10px] text-gray-400">评论</div>
+                    </div>
+                    <div class="text-center bg-gray-50 rounded-xl py-2">
+                        <div class="text-lg font-bold text-green-500">{{ fmtNum(detailItem.share_count) }}</div>
+                        <div class="text-[10px] text-gray-400">分享</div>
+                    </div>
+                    <div class="text-center bg-gray-50 rounded-xl py-2">
+                        <div class="text-lg font-bold text-purple-500">{{ fmtNum(detailItem.view_count) }}</div>
+                        <div class="text-[10px] text-gray-400">播放</div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto p-6 space-y-5">
+                <!-- 描述 -->
+                <div v-if="detailItem.description">
+                    <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">描述</h4>
+                    <p class="text-sm text-gray-700 whitespace-pre-line leading-relaxed">{{ detailItem.description }}</p>
+                </div>
+                <!-- AI分析结果 -->
+                <div v-if="detailItem.analysis" class="bg-purple-50/50 rounded-xl p-4 space-y-3">
+                    <h4 class="text-xs font-semibold text-purple-600 uppercase tracking-wider">AI 选题分析</h4>
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <div><span class="text-gray-400">分类:</span> <span class="font-medium">{{ detailItem.analysis.topic_category }}</span></div>
+                        <div><span class="text-gray-400">Hook:</span> <span class="font-medium">{{ detailItem.analysis.hook_type }}</span></div>
+                        <div><span class="text-gray-400">互动评分:</span> <span class="font-bold text-amber-500">{{ detailItem.analysis.engagement_score }}</span></div>
+                        <div><span class="text-gray-400">可复制性:</span> <span class="font-bold text-emerald-500">{{ detailItem.analysis.replicability_score }}</span></div>
+                    </div>
+                    <div class="text-sm text-gray-600">
+                        <span class="text-gray-400">关键词:</span>
+                        <span v-for="kw in detailItem.analysis.topic_keywords.split(',')" :key="kw"
+                            class="inline-block bg-white px-2 py-0.5 rounded text-xs text-brand-600 mr-1 mt-1">{{ kw }}</span>
+                    </div>
+                    <p v-if="detailItem.analysis.structure_summary" class="text-sm text-gray-600">
+                        <span class="text-gray-400">结构:</span> {{ detailItem.analysis.structure_summary }}
+                    </p>
+                    <div v-if="detailItem.analysis.detail">
+                        <p v-if="detailItem.analysis.detail.why_popular" class="text-sm text-amber-700 bg-amber-50 p-2 rounded-lg mt-2">
+                            <strong>为什么火:</strong> {{ detailItem.analysis.detail.why_popular }}
+                        </p>
+                        <p v-if="detailItem.analysis.detail.replication_suggestions" class="text-sm text-brand-700 bg-brand-50 p-2 rounded-lg mt-2">
+                            <strong>怎么抄:</strong> {{ detailItem.analysis.detail.replication_suggestions }}
+                        </p>
+                    </div>
+                </div>
+                <div v-else-if="!detailItem.is_analyzed" class="text-center py-4">
+                    <button @click="analyzeContent(detailItem.id); detailItem = null" class="bg-purple-500 text-white px-5 py-2 rounded-xl text-sm hover:bg-purple-600 transition font-medium">
+                        &#128300; 分析这条内容
+                    </button>
+                </div>
+                <!-- 评论列表 -->
+                <div v-if="detailItem.comments && detailItem.comments.length">
+                    <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">热门评论 ({{ detailItem.comments.length }})</h4>
+                    <div class="space-y-2">
+                        <div v-for="c in detailItem.comments" :key="c.id" class="bg-gray-50 rounded-lg p-3">
+                            <div class="flex justify-between items-start">
+                                <span class="text-xs font-medium text-gray-600">{{ c.user_name || '匿名' }}</span>
+                                <span class="text-[10px] text-gray-400">&#10084; {{ c.like_count }}</span>
+                            </div>
+                            <p class="text-sm text-gray-700 mt-1">{{ c.text }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div v-else class="text-center py-4">
+                    <button @click="crawlDetailComments" class="text-sm text-gray-400 hover:text-brand-600 transition">&#128172; 抓取评论</button>
+                </div>
+            </div>
+            <div class="p-4 border-t flex items-center justify-between flex-shrink-0">
+                <a :href="detailItem.url" target="_blank" class="text-xs text-brand-600 hover:text-brand-700">&#128279; 查看原文</a>
+                <button @click="detailItem = null" class="px-4 py-1.5 text-sm text-gray-500 hover:text-gray-700 transition">关闭</button>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <script>
 const API = '/api/v1';
-
-const { createApp, ref, reactive, onMounted } = Vue;
+const { createApp, ref, reactive, computed, onMounted, watch } = Vue;
 
 createApp({
     setup() {
-        const activeTab = ref('dashboard');
-        const tabs = [
-            { key: 'dashboard', label: '仪表盘' },
-            { key: 'kols', label: 'KOL管理' },
-            { key: 'contents', label: '内容列表' },
-            { key: 'analysis', label: '选题分析' },
-            { key: 'scripts', label: '视频脚本' },
-        ];
-        const platforms = ['xhs', 'douyin', 'bilibili', 'weibo', 'kuaishou'];
+        const activeTab = ref('home');
+        const tabs = ref([
+            { key:'home', label:'首页', icon:'&#127968;' },
+            { key:'kols', label:'KOL管理', icon:'&#128100;' },
+            { key:'contents', label:'内容', icon:'&#128196;' },
+            { key:'analysis', label:'选题分析', icon:'&#128202;' },
+            { key:'scripts', label:'脚本', icon:'&#128221;' },
+        ]);
+        const platforms = ['xhs','douyin','bilibili','weibo','kuaishou'];
+        const pNames = {xhs:'小红书',douyin:'抖音',bilibili:'B站',weibo:'微博',kuaishou:'快手'};
+        const pName = p => pNames[p]||p;
+        const currentTabLabel = computed(() => tabs.value.find(t=>t.key===activeTab.value)?.label||'');
 
-        // 数据
-        const dashboardStats = ref([]);
-        const monitorLogs = ref([]);
+        // state
+        const stats = ref([]);
         const kols = ref([]);
         const contents = ref([]);
+        const cTotal = ref(0);
+        const cPage = ref(1);
+        const cPageSize = 18;
+        const cFilter = reactive({platform:'',kol_id:'',kol_name:''});
         const trends = ref([]);
         const scripts = ref([]);
-        const contentFilter = reactive({ platform: '' });
+        const toasts = ref([]);
+        let tid = 0;
 
-        // UI状态
+        const detailItem = ref(null);
+        const chartData = ref({});
+        const platformChart = ref(null);
+        const engagementChart = ref(null);
+        let chartInstances = {};
+
+        // modals
         const showAddKol = ref(false);
+        const showSearch = ref(false);
         const showGenScript = ref(false);
         const generating = ref(false);
-        const newKol = reactive({
-            name: '', platform: 'douyin', platform_uid: '', homepage_url: '', tags: '', check_interval: 3600
-        });
-        const newScript = reactive({
-            topic: '', target_platform: 'douyin', target_duration: 60, style_reference: '', additional_instructions: ''
-        });
+        const searching = ref(false);
+        const searchDone = ref(false);
+        const searchResults = ref([]);
+        const searchForm = reactive({platform:'bilibili',keyword:''});
+        const newKol = reactive({name:'',platform:'bilibili',platform_uid:'',homepage_url:'',tags:'',check_interval:3600});
+        const newScript = reactive({topic:'',target_platform:'douyin',target_duration:60,style_reference:'',additional_instructions:''});
 
-        const api = async (path, opts = {}) => {
-            try {
-                const res = await fetch(API + path, {
-                    headers: { 'Content-Type': 'application/json' },
-                    ...opts,
-                    body: opts.body ? JSON.stringify(opts.body) : undefined,
+        // toast
+        const toast = (msg, type='info', dur=3000) => {
+            const id = ++tid;
+            toasts.value.push({id,msg,type});
+            if(type!=='loading') setTimeout(()=>{toasts.value=toasts.value.filter(t=>t.id!==id)},dur);
+            return id;
+        };
+        const rmToast = id => {toasts.value=toasts.value.filter(t=>t.id!==id)};
+
+        // api
+        const api = async (path,opts={}) => {
+            const res = await fetch(API+path,{headers:{'Content-Type':'application/json'},...opts,body:opts.body?JSON.stringify(opts.body):undefined});
+            const d = await res.json();
+            if(!res.ok) throw new Error(d.detail||'请求失败');
+            return d;
+        };
+
+        // load
+        const loadStats = async()=>{try{const d=await api('/monitor/dashboard');stats.value=[
+            {label:'监控中',value:d.active_kols,color:'text-brand-600'},
+            {label:'总内容',value:d.total_contents||0,color:'text-gray-800'},
+            {label:'已分析',value:d.analyzed_contents||0,color:'text-purple-600'},
+            {label:'发现更新',value:d.recent_changes,color:'text-emerald-600'},
+        ];
+        chartData.value = {platformStats:d.platform_stats||{}, topicCategories:d.topic_categories||[], recentEngagement:d.recent_engagement||[]};
+        // 延迟渲染图表
+        setTimeout(()=>renderCharts(),100);
+        }catch(e){}};
+        const loadKols = async()=>{try{kols.value=await api('/kols')||[]}catch(e){}};
+        const loadContents = async()=>{try{
+            let p=`/contents?page=${cPage.value}&page_size=${cPageSize}`;
+            if(cFilter.platform)p+=`&platform=${cFilter.platform}`;
+            if(cFilter.kol_id)p+=`&kol_id=${cFilter.kol_id}`;
+            const d=await api(p);contents.value=d?.items||[];cTotal.value=d?.total||0;
+        }catch(e){}};
+        const loadTrends = async()=>{try{const d=await api('/analysis/trends?limit=30');trends.value=d?.items||[]}catch(e){}};
+        const loadScripts = async()=>{try{scripts.value=await api('/scripts')||[]}catch(e){}};
+        const refreshAll = ()=>{loadStats();loadKols();loadContents();loadTrends();loadScripts()};
+        const switchTab = k=>{activeTab.value=k};
+
+        // actions
+        const addKol = async()=>{
+            if(!newKol.name||!newKol.platform_uid)return;
+            newKol.homepage_url=buildUrl(newKol.platform,newKol.platform_uid);
+            try{await api('/kols',{method:'POST',body:{...newKol}});showAddKol.value=false;
+                toast(`已添加: ${newKol.name}`,'success');Object.assign(newKol,{name:'',platform_uid:'',homepage_url:'',tags:''});
+                loadKols();loadStats();}catch(e){toast(e.message,'error')}
+        };
+        const deleteKol = async id=>{if(!confirm('确定删除？'))return;try{await api(`/kols/${id}`,{method:'DELETE'});toast('已删除','success');loadKols();loadStats()}catch(e){}};
+        const toggleMonitor = async kol=>{try{await api(`/kols/${kol.id}`,{method:'PUT',body:{is_monitoring:!kol.is_monitoring}});
+            toast(kol.is_monitoring?'已暂停':'已启用','success');loadKols()}catch(e){toast('操作失败','error')}};
+
+        const crawlKol = async kol=>{const t=toast(`正在抓取 ${kol.name}...`,'loading');
+            try{const d=await api('/crawl/kol',{method:'POST',body:{kol_id:kol.id,max_count:20}});
+                rmToast(t);toast(d.message,'success',4000);loadContents();loadStats()}catch(e){rmToast(t);toast(`抓取失败: ${e.message}`,'error',4000)}};
+        const crawlComments = async item=>{const t=toast('抓取评论中...','loading');
+            try{const d=await api('/crawl/comments',{method:'POST',body:{content_id:item.id}});rmToast(t);toast(d.message,'success')}catch(e){rmToast(t);toast('失败','error')}};
+        const doSearch = async()=>{if(!searchForm.keyword)return;searching.value=true;searchDone.value=false;
+            try{const d=await api('/crawl/search',{method:'POST',body:{...searchForm,max_count:20}});
+                searchResults.value=d?.items||[];searchDone.value=true;toast(`找到${d.total}条`,'success')}catch(e){searchDone.value=true;toast('搜索失败','error')}
+            searching.value=false};
+
+        const viewKolContents = kol=>{cFilter.kol_id=kol.id;cFilter.kol_name=kol.name;cPage.value=1;loadContents();activeTab.value='contents'};
+        const analyzeKol = async kol=>{const t=toast(`分析 ${kol.name}...`,'loading');
+            try{const d=await api('/analysis/analyze',{method:'POST',body:{kol_id:kol.id}});rmToast(t);toast(d.message,'success',4000);loadTrends();loadContents()}catch(e){rmToast(t);toast('失败','error')}};
+        const analyzeContent = async id=>{const t=toast('分析中...','loading');
+            try{await api('/analysis/analyze',{method:'POST',body:{content_id:id}});rmToast(t);toast('分析完成','success');loadContents();loadTrends()}catch(e){rmToast(t);toast('失败','error')}};
+        const genScript = async()=>{if(!newScript.topic)return;generating.value=true;const t=toast('生成中...','loading');
+            try{await api('/scripts/generate',{method:'POST',body:{...newScript}});rmToast(t);toast('脚本已生成','success');
+                showGenScript.value=false;loadScripts();activeTab.value='scripts'}catch(e){rmToast(t);toast('生成失败','error')}generating.value=false};
+        const generateFromTrend = t=>{newScript.topic=t.topic_keywords||t.title;newScript.target_platform=t.platform;
+            newScript.style_reference=t.hook_type||'';newScript.additional_instructions=t.replication_suggestions||'';showGenScript.value=true};
+        const deleteScript = async id=>{if(!confirm('确定？'))return;try{await api(`/scripts/${id}`,{method:'DELETE'});loadScripts()}catch(e){}};
+        const copyScript = s=>{navigator.clipboard?.writeText(s.full_script||`${s.hook}\n\n${s.body}\n\n${s.cta}`);toast('已复制','success')};
+
+        // helpers
+        const pCls = p=>({'bg-red-100 text-red-700':p==='xhs','bg-gray-800 text-white':p==='douyin','bg-sky-100 text-sky-700':p==='bilibili','bg-amber-100 text-amber-700':p==='weibo','bg-orange-100 text-orange-700':p==='kuaishou'});
+        const fmtTime = t=>t?new Date(t).toLocaleString('zh-CN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'-';
+        const fmtNum = n=>n>=10000?(n/10000).toFixed(1)+'w':(n||0);
+        const buildUrl = (p,uid)=>({bilibili:`https://space.bilibili.com/${uid}`,douyin:`https://www.douyin.com/user/${uid}`,xhs:`https://www.xiaohongshu.com/user/profile/${uid}`,weibo:`https://m.weibo.cn/u/${uid}`,kuaishou:`https://www.kuaishou.com/profile/${uid}`}[p]||'');
+        const uidHint = computed(()=>({bilibili:'UID数字, 如 163637592',douyin:'sec_user_id',xhs:'用户ID',weibo:'UID数字',kuaishou:'用户ID'}[newKol.platform]||''));
+        const uidHelp = computed(()=>({bilibili:'打开UP主主页，URL中的数字',douyin:'打开主页，URL中user/后面的字符串',xhs:'打开主页，URL中profile/后面的ID',weibo:'打开主页，URL中u/后面的数字',kuaishou:'打开主页，URL中profile/后面的ID'}[newKol.platform]||''));
+
+        // 新增功能
+        const openDetail = async(item)=>{
+            try{const d=await api(`/contents/${item.id}/detail`);detailItem.value=d}catch(e){toast('加载失败','error')}
+        };
+        const crawlDetailComments = async()=>{
+            if(!detailItem.value)return;
+            const t=toast('抓取评论中...','loading');
+            try{await api('/crawl/comments',{method:'POST',body:{content_id:detailItem.value.id}});
+                rmToast(t);toast('评论已抓取','success');
+                const d=await api(`/contents/${detailItem.value.id}/detail`);detailItem.value=d;
+            }catch(e){rmToast(t);toast('失败','error')}
+        };
+        const refreshKolProfile = async(kol)=>{
+            const t=toast(`刷新 ${kol.name} 资料...`,'loading');
+            try{const d=await api('/crawl/profile',{method:'POST',body:{kol_id:kol.id}});
+                rmToast(t);toast(d.message,'success');loadKols()}catch(e){rmToast(t);toast('刷新失败','error')}
+        };
+        const saveSearchItem = async(r)=>{
+            try{const d=await api('/crawl/save',{method:'POST',body:{platform:searchForm.platform,content_id:r.content_id,title:r.title,url:r.url,cover_url:r.cover_url,content_type:r.content_type||'video',like_count:r.like_count,comment_count:r.comment_count,view_count:r.view_count,tags:r.tags}});
+                toast(d.message,d.saved?'success':'info');if(d.saved)loadContents()}catch(e){toast('保存失败','error')}
+        };
+        const renderCharts = ()=>{
+            const cd = chartData.value;
+            // 平台分布饼图
+            if(platformChart.value && cd.platformStats && Object.keys(cd.platformStats).length){
+                if(chartInstances.platform) chartInstances.platform.destroy();
+                const colors = {xhs:'#ef4444',douyin:'#1f2937',bilibili:'#0ea5e9',weibo:'#f59e0b',kuaishou:'#f97316'};
+                chartInstances.platform = new Chart(platformChart.value,{
+                    type:'doughnut',
+                    data:{labels:Object.keys(cd.platformStats).map(p=>pNames[p]||p),
+                        datasets:[{data:Object.values(cd.platformStats),backgroundColor:Object.keys(cd.platformStats).map(p=>colors[p]||'#94a3b8')}]},
+                    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{boxWidth:12,font:{size:11}}}}}
                 });
-                return await res.json();
-            } catch (e) {
-                console.error('API Error:', e);
-                return null;
+            }
+            // 互动柱状图
+            if(engagementChart.value && cd.recentEngagement && cd.recentEngagement.length){
+                if(chartInstances.engagement) chartInstances.engagement.destroy();
+                chartInstances.engagement = new Chart(engagementChart.value,{
+                    type:'bar',
+                    data:{labels:cd.recentEngagement.map(r=>r.title),
+                        datasets:[
+                            {label:'点赞',data:cd.recentEngagement.map(r=>r.likes),backgroundColor:'#f87171'},
+                            {label:'评论',data:cd.recentEngagement.map(r=>r.comments),backgroundColor:'#60a5fa'},
+                        ]},
+                    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:10,font:{size:10}}}},
+                        scales:{x:{ticks:{display:false}},y:{beginAtZero:true,ticks:{font:{size:10}}}}}
+                });
             }
         };
-
-        const loadDashboard = async () => {
-            const data = await api('/monitor/dashboard');
-            if (data) {
-                dashboardStats.value = [
-                    { label: '监控KOL', value: data.active_kols, color: 'text-blue-600' },
-                    { label: '总KOL', value: data.total_kols, color: 'text-gray-900' },
-                    { label: '总检查次数', value: data.total_checks, color: 'text-gray-900' },
-                    { label: '发现更新', value: data.recent_changes, color: 'text-green-600' },
-                ];
-            }
-        };
-        const loadLogs = async () => { monitorLogs.value = (await api('/monitor/logs?limit=20')) || []; };
-        const loadKols = async () => { kols.value = (await api('/kols')) || []; };
-        const loadContents = async () => {
-            let path = '/contents?page_size=30';
-            if (contentFilter.platform) path += `&platform=${contentFilter.platform}`;
-            const data = await api(path);
-            contents.value = data?.items || [];
-        };
-        const loadTrends = async () => {
-            const data = await api('/analysis/trends');
-            trends.value = data?.items || [];
-        };
-        const loadScripts = async () => { scripts.value = (await api('/scripts')) || []; };
-
-        const refreshAll = () => {
-            loadDashboard(); loadLogs(); loadKols(); loadContents(); loadTrends(); loadScripts();
-        };
-
-        const addKol = async () => {
-            await api('/kols', { method: 'POST', body: { ...newKol } });
-            showAddKol.value = false;
-            Object.assign(newKol, { name: '', platform_uid: '', homepage_url: '', tags: '' });
-            loadKols();
-        };
-
-        const deleteKol = async (id) => {
-            if (confirm('确定删除？')) { await api(`/kols/${id}`, { method: 'DELETE' }); loadKols(); }
-        };
-
-        const checkKol = async (id) => {
-            await api('/monitor/check', { method: 'POST', body: { kol_id: id } });
-            loadLogs(); loadContents();
-        };
-
-        const analyzeContent = async (id) => {
-            await api('/analysis/analyze', { method: 'POST', body: { content_id: id } });
-            loadContents(); loadTrends();
-        };
-
-        const genScript = async () => {
-            generating.value = true;
-            await api('/scripts/generate', { method: 'POST', body: { ...newScript } });
-            generating.value = false;
-            showGenScript.value = false;
-            loadScripts();
-        };
-
-        const generateFromTrend = (trend) => {
-            newScript.topic = trend.topic_keywords || trend.title;
-            newScript.target_platform = trend.platform;
-            newScript.style_reference = trend.hook_type || '';
-            newScript.additional_instructions = trend.replication_suggestions || '';
-            showGenScript.value = true;
-        };
-
-        const deleteScript = async (id) => {
-            if (confirm('确定删除？')) { await api(`/scripts/${id}`, { method: 'DELETE' }); loadScripts(); }
-        };
-
-        const copyScript = (script) => {
-            navigator.clipboard?.writeText(script.full_script || `${script.hook}\n\n${script.body}\n\n${script.cta}`);
-            alert('已复制到剪贴板');
-        };
-
-        const platformClass = (p) => ({
-            'bg-red-50 text-red-700': p === 'xhs',
-            'bg-gray-900 text-white': p === 'douyin',
-            'bg-pink-50 text-pink-700': p === 'bilibili',
-            'bg-yellow-50 text-yellow-700': p === 'weibo',
-            'bg-orange-50 text-orange-700': p === 'kuaishou',
-        });
-
-        const formatTime = (t) => t ? new Date(t).toLocaleString('zh-CN') : '-';
 
         onMounted(refreshAll);
-
-        return {
-            activeTab, tabs, platforms,
-            dashboardStats, monitorLogs, kols, contents, trends, scripts, contentFilter,
-            showAddKol, showGenScript, generating, newKol, newScript,
-            refreshAll, addKol, deleteKol, checkKol, analyzeContent, genScript,
-            generateFromTrend, deleteScript, copyScript, platformClass, formatTime, loadContents,
-        };
+        return {activeTab,tabs,platforms,pName,pCls,currentTabLabel,stats,kols,contents,cTotal,cPage,cPageSize,cFilter,trends,scripts,toasts,
+            showAddKol,showSearch,showGenScript,generating,searching,searchDone,searchResults,searchForm,newKol,newScript,
+            detailItem,chartData,platformChart,engagementChart,
+            refreshAll,switchTab,loadContents,addKol,deleteKol,toggleMonitor,crawlKol,crawlComments,doSearch,viewKolContents,
+            analyzeKol,analyzeContent,genScript,generateFromTrend,deleteScript,copyScript,fmtTime,fmtNum,uidHint,uidHelp,
+            openDetail,crawlDetailComments,refreshKolProfile,saveSearchItem};
     }
 }).mount('#app');
 </script>

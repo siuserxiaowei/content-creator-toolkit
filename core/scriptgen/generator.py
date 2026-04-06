@@ -1,4 +1,5 @@
 """视频脚本生成器 - LLM驱动，根据选题自动生成视频脚本"""
+from __future__ import annotations
 
 import json
 from openai import AsyncOpenAI
@@ -46,11 +47,17 @@ class ScriptGenerator:
     """视频脚本生成器"""
 
     def __init__(self):
-        self.client = AsyncOpenAI(
-            api_key=settings.openai_api_key,
-            base_url=settings.openai_base_url,
-        )
+        self._client = None
         self.model = settings.openai_model
+
+    @property
+    def client(self):
+        if self._client is None:
+            self._client = AsyncOpenAI(
+                api_key=settings.openai_api_key or "sk-placeholder",
+                base_url=settings.openai_base_url,
+            )
+        return self._client
 
     async def generate(
         self,
@@ -111,7 +118,7 @@ class ScriptGenerator:
                     cta=script_data.get("cta", ""),
                     full_script=full_script,
                     source_content_ids=source_content_ids,
-                    metadata={
+                    extra_data={
                         "visual_notes": script_data.get("visual_notes", ""),
                         "bgm_suggestion": script_data.get("bgm_suggestion", ""),
                         "estimated_duration": script_data.get("estimated_duration"),

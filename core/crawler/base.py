@@ -1,4 +1,5 @@
 """爬虫基类 - 所有平台爬虫的抽象接口"""
+from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -37,6 +38,21 @@ class BaseCrawler(ABC):
             timeout=30.0,
             follow_redirects=True,
         )
+
+    async def fetch_user_profile(self, user_id: str, cookie: str = "") -> dict | None:
+        """获取用户资料
+        返回格式: {
+            "name": str,
+            "avatar_url": str,
+            "follower_count": int,
+            "following_count": int,
+            "description": str,
+            "video_count": int,
+            "like_count": int,
+        }
+        默认返回None，子类可选实现
+        """
+        return None
 
     @abstractmethod
     async def fetch_user_posts(self, user_id: str, cookie: str = "", max_count: int = 20) -> list[dict]:

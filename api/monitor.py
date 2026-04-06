@@ -1,5 +1,7 @@
 """监控管理API"""
+from __future__ import annotations
 
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,8 +36,8 @@ async def trigger_check_all():
 
 @router.get("/logs", response_model=list[MonitorLogResponse])
 async def list_monitor_logs(
-    kol_id: int | None = None,
-    status: str | None = None,
+    kol_id: Optional[int] = None,
+    status: Optional[str] = None,
     limit: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
 ):
@@ -59,9 +61,45 @@ async def monitor_dashboard(db: AsyncSession = Depends(get_db)):
     recent_changes = await db.scalar(
         select(func.count(MonitorLog.id)).where(MonitorLog.status == "changed")
     )
+    # 内容统计
+    from storage.models import Content, TopicAnalysis
+    total_contents = await db.scalar(select(func.count(Content.id)))
+    analyzed_contents = await db.scalar(select(func.count(Content.id)).where(Content.is_analyzed == True))
+
+    # 各平台内容数量
+    platform_stats = {}
+    for p in ["xhs", "douyin", "bilibili", "weibo", "kuaishou"]:
+        cnt = await db.scalar(select(func.count(Content.id)).where(Content.platform == p))
+        if cnt:
+            platform_stats[p] = cnt
+
+    # 选题分类统计
+    topic_stats_result = await db.execute(
+        select(TopicAnalysis.topic_category, func.count(TopicAnalysis.id))
+        .group_by(TopicAnalysis.topic_category)
+        .order_by(func.count(TopicAnalysis.id).desc())
+        .limit(10)
+    )
+    topic_categories = [{"name": r[0] or "未分类", "count": r[1]} for r in topic_stats_result.all()]
+
+    # 最近内容的互动数据（用于柱状图）
+    recent_contents_result = await db.execute(
+        select(Content.title, Content.like_count, Content.comment_count, Content.view_count, Content.platform)
+        .order_by(Content.created_at.desc()).limit(10)
+    )
+    recent_engagement = [
+        {"title": r[0][:20] if r[0] else "无标题", "likes": r[1], "comments": r[2], "views": r[3], "platform": r[4]}
+        for r in recent_contents_result.all()
+    ]
+
     return {
         "total_kols": total_kols or 0,
         "active_kols": active_kols or 0,
         "total_checks": total_checks or 0,
         "recent_changes": recent_changes or 0,
+        "total_contents": total_contents or 0,
+        "analyzed_contents": analyzed_contents or 0,
+        "platform_stats": platform_stats,
+        "topic_categories": topic_categories,
+        "recent_engagement": recent_engagement,
     }

@@ -1,5 +1,57 @@
 # 开发日志
 
+## 2026-04-06 - Sprint 3: 竞品对标全面补齐
+
+### 竞品调研
+调研了新榜、蝉妈妈、灰豚数据、飞瓜数据、即梦、有米有数、vidIQ、Social Blade等10+竞品，提炼核心UX模式。
+
+### 新增后端API
+- `POST /crawl/profile` — 抓取KOL资料（粉丝数/头像/简介），B站+微博已实现
+- `POST /crawl/save` — 保存搜索结果到内容库（kol_id改为可选）
+- `GET /contents/{id}/detail` — 内容完整详情（含评论+AI分析结果）
+- `GET /monitor/dashboard` 增强 — 新增total_contents/analyzed_contents/platform_stats/topic_categories/recent_engagement
+
+### 爬虫增强
+- BaseCrawler新增 `fetch_user_profile()` 方法
+- BilibiliCrawler实现用户资料抓取（acc/info + stat fallback）
+- WeiboCrawler实现用户资料抓取（m.weibo.cn API）
+
+### 前端新功能
+- **KOL资料卡增强**: 头像+粉丝数+简介+「刷新资料」按钮
+- **内容详情弹窗**: 点击标题展开完整信息（描述/评论/AI分析/4项数据指标）
+- **数据可视化**: Chart.js图表 — 平台内容分布饼图 + 互动对比柱状图
+- **搜索结果可保存**: 每条搜索结果旁有「保存」按钮，一键入库
+- **Dashboard增强**: 统计卡片改为"监控中/总内容/已分析/发现更新"
+
+### 数据模型变更
+- Content.kol_id 改为可选（nullable=True），支持无KOL关联的搜索保存内容
+
+---
+
+## 2026-04-06 - Sprint 2: 前端交互重做 + 爬取API
+
+### 新增
+- **爬取操作API** (`api/crawl.py`)
+  - `POST /api/v1/crawl/kol` - 手动抓取KOL最新内容（入库去重）
+  - `POST /api/v1/crawl/search` - 关键词搜索各平台内容（已验证B站可用）
+  - `POST /api/v1/crawl/comments` - 抓取指定内容的评论
+- **前端全面重做** (`web/index.html`)
+  - 仪表盘新增快速操作区（添加KOL/搜索内容/生成脚本/全量检查）
+  - KOL卡片新增操作按钮：抓取内容 / 查看内容 / 分析选题 / 暂停监控 / 删除
+  - 内容列表新增：分析选题按钮 / 抓评论按钮 / 搜索抓取入口 / 分页
+  - 新增搜索弹窗：选平台+输关键词，实时搜索各平台内容
+  - 所有空状态都有引导提示和操作按钮
+  - Toast通知系统（操作反馈）
+  - 添加KOL时自动生成主页URL + 各平台UID获取提示
+  - 平台名中文化（xhs→小红书, douyin→抖音 等）
+
+### 修复
+- Python 3.9 兼容性（`from __future__ import annotations` + `Optional[X]`）
+- SQLAlchemy `metadata` 保留字冲突（改为 `extra_data`）
+- OpenAI客户端懒加载（避免无API key时启动报错）
+
+---
+
 ## 2026-04-06 - Sprint 1: 全系统搭建
 
 ### 已完成

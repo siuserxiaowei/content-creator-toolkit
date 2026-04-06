@@ -1,5 +1,7 @@
 """KOL管理API"""
+from __future__ import annotations
 
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,8 +17,8 @@ logger = get_logger("api.kol")
 
 @router.get("", response_model=list[KOLResponse])
 async def list_kols(
-    platform: str | None = None,
-    is_monitoring: bool | None = None,
+    platform: Optional[str] = None,
+    is_monitoring: Optional[bool] = None,
     db: AsyncSession = Depends(get_db),
 ):
     """获取KOL列表"""

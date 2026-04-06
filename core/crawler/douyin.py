@@ -1,4 +1,5 @@
 """抖音爬虫 - 基于Web API"""
+from __future__ import annotations
 
 from core.crawler.base import BaseCrawler
 from core.logger import get_logger

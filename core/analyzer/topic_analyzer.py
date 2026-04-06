@@ -1,4 +1,5 @@
 """选题分析引擎 - LLM驱动，分析KOL内容的选题策略"""
+from __future__ import annotations
 
 import json
 from openai import AsyncOpenAI
@@ -46,11 +47,17 @@ class TopicAnalyzer:
     """选题分析器"""
 
     def __init__(self):
-        self.client = AsyncOpenAI(
-            api_key=settings.openai_api_key,
-            base_url=settings.openai_base_url,
-        )
+        self._client = None
         self.model = settings.openai_model
+
+    @property
+    def client(self):
+        if self._client is None:
+            self._client = AsyncOpenAI(
+                api_key=settings.openai_api_key or "sk-placeholder",
+                base_url=settings.openai_base_url,
+            )
+        return self._client
 
     async def analyze_content(self, content_id: int) -> dict | None:
         """分析单条内容的选题"""

@@ -1,4 +1,5 @@
 """媒体下载引擎 - 对接已有下载器 + yt-dlp本地兜底"""
+from __future__ import annotations
 
 import asyncio
 from pathlib import Path

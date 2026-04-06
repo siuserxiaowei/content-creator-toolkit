@@ -1,4 +1,5 @@
 """小红书爬虫 - 基于Web API"""
+from __future__ import annotations
 
 from datetime import datetime
 from urllib.parse import quote

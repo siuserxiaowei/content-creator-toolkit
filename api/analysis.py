@@ -1,5 +1,7 @@
 """选题分析API"""
+from __future__ import annotations
 
+from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,7 +37,7 @@ async def trigger_analysis(req: AnalysisRequest):
 
 @router.get("/trends")
 async def get_trends(
-    platform: str | None = None,
+    platform: Optional[str] = None,
     limit: int = Query(default=20, ge=1, le=100),
 ):
     """获取选题趋势"""

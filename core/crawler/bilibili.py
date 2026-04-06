@@ -1,4 +1,5 @@
 """B站爬虫 - 基于公开API"""
+from __future__ import annotations
 
 from core.crawler.base import BaseCrawler
 from core.logger import get_logger
@@ -17,6 +18,42 @@ class BilibiliCrawler(BaseCrawler):
             "Referer": "https://www.bilibili.com/",
             "Origin": "https://www.bilibili.com",
         })
+
+    async def fetch_user_profile(self, user_id: str, cookie: str = "") -> dict | None:
+        """获取B站UP主资料"""
+        url = f"{BILI_API}/x/space/wbi/acc/info"
+        params = {"mid": user_id}
+        async with self._get_client(cookie) as client:
+            try:
+                data = await self._request(client, "GET", url, params=params)
+                info = data.get("data", {})
+                return {
+                    "name": info.get("name", ""),
+                    "avatar_url": info.get("face", ""),
+                    "follower_count": info.get("fans", 0),
+                    "following_count": info.get("attention", 0),
+                    "description": info.get("sign", ""),
+                    "video_count": 0,
+                    "like_count": info.get("likes", 0),
+                }
+            except Exception as e:
+                logger.warning(f"获取B站用户资料失败: {e}")
+                # fallback: 用stat接口
+                try:
+                    stat_url = f"{BILI_API}/x/relation/stat"
+                    stat_data = await self._request(client, "GET", stat_url, params={"vmid": user_id})
+                    s = stat_data.get("data", {})
+                    return {
+                        "name": "",
+                        "avatar_url": "",
+                        "follower_count": s.get("follower", 0),
+                        "following_count": s.get("following", 0),
+                        "description": "",
+                        "video_count": 0,
+                        "like_count": 0,
+                    }
+                except Exception:
+                    return None
 
     async def fetch_user_posts(self, user_id: str, cookie: str = "", max_count: int = 20) -> list[dict]:
         """获取B站UP主视频列表"""

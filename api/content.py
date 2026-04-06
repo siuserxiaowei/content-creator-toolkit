@@ -1,5 +1,7 @@
 """内容管理API"""
+from __future__ import annotations
 
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,10 +17,10 @@ logger = get_logger("api.content")
 
 @router.get("", response_model=ContentListResponse)
 async def list_contents(
-    kol_id: int | None = None,
-    platform: str | None = None,
-    content_type: str | None = None,
-    is_analyzed: bool | None = None,
+    kol_id: Optional[int] = None,
+    platform: Optional[str] = None,
+    content_type: Optional[str] = None,
+    is_analyzed: Optional[bool] = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -91,6 +93,69 @@ async def get_content_comments(
             }
             for c in comments
         ],
+    }
+
+
+@router.get("/{content_id}/detail")
+async def get_content_detail(content_id: int, db: AsyncSession = Depends(get_db)):
+    """获取内容完整详情（含评论+分析）"""
+    content = await db.get(Content, content_id)
+    if not content:
+        raise HTTPException(404, "内容不存在")
+
+    # 获取评论
+    comments_result = await db.execute(
+        select(Comment).where(Comment.content_id == content_id)
+        .order_by(Comment.like_count.desc()).limit(50)
+    )
+    comments = comments_result.scalars().all()
+
+    # 获取分析
+    from storage.models import TopicAnalysis
+    analysis_result = await db.execute(
+        select(TopicAnalysis).where(TopicAnalysis.content_id == content_id)
+    )
+    analysis = analysis_result.scalar_one_or_none()
+
+    # 获取KOL名
+    kol_name = ""
+    if content.kol_id:
+        from storage.models import KOL
+        kol = await db.get(KOL, content.kol_id)
+        if kol:
+            kol_name = kol.name
+
+    return {
+        "id": content.id,
+        "kol_id": content.kol_id,
+        "kol_name": kol_name,
+        "platform": content.platform,
+        "content_type": content.content_type,
+        "content_id": content.content_id,
+        "title": content.title,
+        "description": content.description,
+        "url": content.url,
+        "cover_url": content.cover_url,
+        "tags": content.tags,
+        "like_count": content.like_count,
+        "comment_count": content.comment_count,
+        "share_count": content.share_count,
+        "view_count": content.view_count,
+        "published_at": content.published_at,
+        "is_analyzed": content.is_analyzed,
+        "comments": [
+            {"id": c.id, "user_name": c.user_name, "text": c.text, "like_count": c.like_count}
+            for c in comments
+        ],
+        "analysis": {
+            "topic_category": analysis.topic_category,
+            "topic_keywords": analysis.topic_keywords,
+            "hook_type": analysis.hook_type,
+            "structure_summary": analysis.structure_summary,
+            "engagement_score": analysis.engagement_score,
+            "replicability_score": analysis.replicability_score,
+            "detail": analysis.analysis_detail,
+        } if analysis else None,
     }
 
 

@@ -1,5 +1,7 @@
 """脚本生成API"""
+from __future__ import annotations
 
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,7 +34,7 @@ async def generate_script(req: ScriptGenerateRequest):
 
 @router.get("", response_model=list[ScriptResponse])
 async def list_scripts(
-    status: str | None = None,
+    status: Optional[str] = None,
     limit: int = Query(default=20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):

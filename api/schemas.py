@@ -1,6 +1,8 @@
 """API请求/响应模型"""
 
 from datetime import datetime
+from typing import List, Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -16,11 +18,11 @@ class KOLCreate(BaseModel):
 
 
 class KOLUpdate(BaseModel):
-    name: str | None = None
-    description: str | None = None
-    tags: str | None = None
-    is_monitoring: bool | None = None
-    check_interval: int | None = Field(default=None, ge=300, le=86400)
+    name: Optional[str] = None
+    description: Optional[str] = None
+    tags: Optional[str] = None
+    is_monitoring: Optional[bool] = None
+    check_interval: Optional[int] = Field(default=None, ge=300, le=86400)
 
 
 class KOLResponse(BaseModel):
@@ -35,7 +37,7 @@ class KOLResponse(BaseModel):
     tags: str
     is_monitoring: bool
     check_interval: int
-    last_checked_at: datetime | None
+    last_checked_at: Optional[datetime]
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -57,7 +59,7 @@ class ContentResponse(BaseModel):
     comment_count: int
     share_count: int
     view_count: int
-    published_at: datetime | None
+    published_at: Optional[datetime]
     is_downloaded: bool
     is_analyzed: bool
     created_at: datetime
@@ -67,7 +69,7 @@ class ContentResponse(BaseModel):
 
 class ContentListResponse(BaseModel):
     total: int
-    items: list[ContentResponse]
+    items: List[ContentResponse]
 
 
 # ===== Monitor =====
@@ -89,8 +91,8 @@ class MonitorLogResponse(BaseModel):
 
 # ===== Analysis =====
 class AnalysisRequest(BaseModel):
-    content_id: int | None = None
-    kol_id: int | None = None
+    content_id: Optional[int] = None
+    kol_id: Optional[int] = None
     batch: bool = False
 
 
@@ -103,7 +105,7 @@ class TopicAnalysisResponse(BaseModel):
     structure_summary: str
     engagement_score: float
     replicability_score: float
-    analysis_detail: dict | None
+    analysis_detail: Optional[dict]
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -115,7 +117,7 @@ class ScriptGenerateRequest(BaseModel):
     style_reference: str = ""
     target_platform: str = "douyin"
     target_duration: int = Field(default=60, ge=15, le=600)
-    source_content_ids: list[int] = []
+    source_content_ids: List[int] = []
     additional_instructions: str = ""
 
 
@@ -139,4 +141,4 @@ class ScriptResponse(BaseModel):
 # ===== 通用 =====
 class MessageResponse(BaseModel):
     message: str
-    data: dict | None = None
+    data: Optional[dict] = None
