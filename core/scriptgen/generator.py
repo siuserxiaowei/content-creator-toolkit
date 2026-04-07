@@ -79,8 +79,11 @@ class ScriptGenerator:
             "douyin": "抖音（竖屏短视频，快节奏，15-60秒为主）",
             "bilibili": "B站（横屏，可以稍长，1-5分钟，观众接受深度内容）",
             "xhs": "小红书（图文+视频，种草风格，真实感很重要）",
-            "kuaishou": "快手（接地气，真实，生活化）",
             "weibo": "微博（话题性强，容易引发讨论）",
+            "youtube": "YouTube（横屏长视频，深度内容，8-15分钟为主）",
+            "twitter": "Twitter/X（短视频+图文，话题驱动，国际化受众）",
+            "tiktok": "TikTok（竖屏短视频，全球化，15-60秒）",
+            "instagram": "Instagram（精致视觉，Reels短视频+图文帖）",
         }
 
         prompt = SCRIPT_PROMPT.format(

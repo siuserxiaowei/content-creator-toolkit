@@ -15,7 +15,7 @@ class KOL(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(100), comment="博主名称")
-    platform: Mapped[str] = mapped_column(String(20), comment="平台: xhs/douyin/bilibili/weibo/kuaishou")
+    platform: Mapped[str] = mapped_column(String(20), comment="平台: xhs/douyin/bilibili/weibo/youtube/twitter/tiktok/instagram")
     platform_uid: Mapped[str] = mapped_column(String(200), comment="平台用户ID")
     homepage_url: Mapped[str] = mapped_column(String(500), comment="主页URL")
     avatar_url: Mapped[str] = mapped_column(String(500), default="")

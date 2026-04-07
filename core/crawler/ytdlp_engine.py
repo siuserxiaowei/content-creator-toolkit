@@ -2,24 +2,44 @@
 
 yt-dlp能拿到视频元数据（标题/描述/播放量/点赞/评论数/封面/上传者等），
 无需反爬签名，支持: 抖音单视频/B站/YouTube/TikTok/Twitter/Instagram
+
+Twitter/Instagram 降级方案: 通过外部 media-downloader API 获取媒体
 """
 from __future__ import annotations
 
 import asyncio
 import json
+import re
 from datetime import datetime
 from typing import Optional
 
+import httpx
+
+from config.settings import settings
 from core.logger import get_logger
 
 logger = get_logger("crawler.ytdlp")
 
 
 class YtdlpEngine:
-    """基于yt-dlp的元数据抓取引擎"""
+    """基于yt-dlp的元数据抓取引擎，Twitter/Instagram降级到外部API"""
 
     async def extract_video_info(self, url: str) -> dict | None:
         """提取单个视频/帖子的元数据"""
+        # 先尝试 yt-dlp
+        result = await self._ytdlp_extract(url)
+        if result:
+            return result
+
+        # yt-dlp 失败时，Twitter/Instagram 走外部 media-downloader API
+        if self._is_twitter_or_instagram(url):
+            logger.info(f"yt-dlp失败，尝试外部API: {url}")
+            return await self._media_downloader_extract(url)
+
+        return None
+
+    async def _ytdlp_extract(self, url: str) -> dict | None:
+        """yt-dlp 提取"""
         try:
             cmd = [
                 "yt-dlp",
@@ -53,6 +73,101 @@ class YtdlpEngine:
         except Exception as e:
             logger.error(f"yt-dlp异常: {e}")
             return None
+
+    async def _media_downloader_extract(self, url: str) -> dict | None:
+        """通过外部 media-downloader API 提取（Twitter/Instagram降级方案）"""
+        api_base = settings.media_downloader_url.rstrip("/")
+        if not api_base:
+            return None
+
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                # 提交任务
+                resp = await client.post(f"{api_base}/api/download", json={"url": url})
+                resp.raise_for_status()
+                task_id = resp.json().get("task_id")
+                if not task_id:
+                    return None
+
+                # 轮询等待结果（最多45秒）
+                for _ in range(15):
+                    await asyncio.sleep(3)
+                    status_resp = await client.get(f"{api_base}/api/status/{task_id}")
+                    status_data = status_resp.json()
+
+                    if status_data.get("status") == "completed":
+                        return self._normalize_downloader_result(status_data, url)
+                    elif status_data.get("status") == "error":
+                        err = status_data.get("result", {}).get("error", "unknown")
+                        logger.warning(f"外部API失败 [{url}]: {err[:200]}")
+                        return None
+
+                logger.warning(f"外部API超时 [{url}]")
+                return None
+
+        except Exception as e:
+            logger.error(f"外部API异常: {e}")
+            return None
+
+    def _normalize_downloader_result(self, data: dict, source_url: str) -> dict | None:
+        """将 media-downloader API 的结果转为统一格式"""
+        result = data.get("result", {})
+        if not result.get("success"):
+            return None
+
+        files = result.get("files", [])
+        platform = self._detect_platform("", source_url)
+
+        # 从URL提取内容ID
+        content_id = self._extract_id_from_url(source_url) or data.get("id", "")
+
+        media_urls = []
+        cover_url = ""
+        for f in files:
+            ftype = f.get("type", "video")
+            furl = f.get("url", "")
+            if ftype == "image" and not cover_url:
+                cover_url = furl
+            media_urls.append({"type": ftype, "url": furl})
+
+        return {
+            "content_id": str(content_id),
+            "content_type": "video" if any(f.get("type") == "video" for f in files) else "note",
+            "title": result.get("title", ""),
+            "description": result.get("description", ""),
+            "url": source_url,
+            "cover_url": cover_url or result.get("thumbnail", ""),
+            "media_urls": media_urls,
+            "tags": "",
+            "like_count": result.get("like_count", 0),
+            "comment_count": result.get("comment_count", 0),
+            "share_count": result.get("repost_count", 0),
+            "view_count": result.get("view_count", 0),
+            "published_at": None,
+            "platform": platform,
+            "uploader": result.get("author", ""),
+            "uploader_id": result.get("author_id", ""),
+            "duration": 0,
+            "raw_data": {"source": "media-downloader-api", "task_id": data.get("id")},
+        }
+
+    @staticmethod
+    def _is_twitter_or_instagram(url: str) -> bool:
+        url_lower = url.lower()
+        return any(d in url_lower for d in ["twitter.com", "x.com", "instagram.com"])
+
+    @staticmethod
+    def _extract_id_from_url(url: str) -> str:
+        """从Twitter/Instagram URL中提取内容ID"""
+        # Twitter: /status/1234567890
+        m = re.search(r"/status/(\d+)", url)
+        if m:
+            return m.group(1)
+        # Instagram: /p/ABC123/ or /reel/ABC123/
+        m = re.search(r"/(p|reel|tv)/([A-Za-z0-9_-]+)", url)
+        if m:
+            return m.group(2)
+        return ""
 
     async def extract_playlist(self, url: str, max_count: int = 20) -> list[dict]:
         """提取播放列表/用户主页的视频列表（B站空间、YouTube频道等）"""

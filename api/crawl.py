@@ -23,7 +23,7 @@ class CrawlKolRequest(BaseModel):
 
 
 class CrawlSearchRequest(BaseModel):
-    platform: str = Field(..., pattern="^(xhs|douyin|bilibili|weibo|kuaishou)$")
+    platform: str = Field(..., pattern="^(xhs|douyin|bilibili|weibo)$")
     keyword: str
     max_count: int = Field(default=20, ge=1, le=50)
 
@@ -39,7 +39,6 @@ def _get_cookie(platform: str) -> str:
         "douyin": settings.douyin_cookie,
         "bilibili": settings.bilibili_cookie,
         "weibo": settings.weibo_cookie,
-        "kuaishou": settings.kuaishou_cookie,
     }
     return cookie_map.get(platform, "")
 

@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 # ===== KOL =====
 class KOLCreate(BaseModel):
     name: str
-    platform: str = Field(..., pattern="^(xhs|douyin|bilibili|weibo|kuaishou)$")
+    platform: str = Field(..., pattern="^(xhs|douyin|bilibili|weibo|youtube|twitter|tiktok|instagram)$")
     platform_uid: str
     homepage_url: str
     description: str = ""

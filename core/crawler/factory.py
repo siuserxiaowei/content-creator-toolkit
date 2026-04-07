@@ -5,7 +5,6 @@ from core.crawler.xhs import XHSCrawler
 from core.crawler.douyin import DouyinCrawler
 from core.crawler.bilibili import BilibiliCrawler
 from core.crawler.weibo import WeiboCrawler
-from core.crawler.kuaishou import KuaishouCrawler
 
 
 class CrawlerFactory:
@@ -22,7 +21,6 @@ class CrawlerFactory:
                 "douyin": DouyinCrawler,
                 "bilibili": BilibiliCrawler,
                 "weibo": WeiboCrawler,
-                "kuaishou": KuaishouCrawler,
             }
             crawler_cls = crawler_map.get(platform)
             if not crawler_cls:
@@ -32,4 +30,4 @@ class CrawlerFactory:
 
     @classmethod
     def supported_platforms(cls) -> list[str]:
-        return ["xhs", "douyin", "bilibili", "weibo", "kuaishou"]
+        return ["xhs", "douyin", "bilibili", "weibo"]

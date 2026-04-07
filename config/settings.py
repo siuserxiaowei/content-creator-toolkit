@@ -51,7 +51,6 @@ class Settings(BaseSettings):
     douyin_cookie: str = ""
     bilibili_cookie: str = ""
     weibo_cookie: str = ""
-    kuaishou_cookie: str = ""
 
     # 路径
     data_dir: Path = BASE_DIR / "data"

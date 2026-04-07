@@ -134,7 +134,6 @@ class MonitorEngine:
             "douyin": settings.douyin_cookie,
             "bilibili": settings.bilibili_cookie,
             "weibo": settings.weibo_cookie,
-            "kuaishou": settings.kuaishou_cookie,
         }
         return cookie_map.get(platform, "")
 

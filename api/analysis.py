@@ -20,17 +20,23 @@ logger = get_logger("api.analysis")
 async def trigger_analysis(req: AnalysisRequest):
     """触发选题分析"""
     if req.content_id:
-        result = await topic_analyzer.analyze_content(req.content_id)
-        if result:
-            return MessageResponse(message="分析完成", data=result)
-        return MessageResponse(message="分析失败")
+        try:
+            result = await topic_analyzer.analyze_content(req.content_id)
+            if result:
+                return MessageResponse(message="分析完成", data=result)
+            return MessageResponse(message="分析失败: 未知错误")
+        except RuntimeError as e:
+            return MessageResponse(message=f"分析失败: {e}")
 
     if req.kol_id:
-        results = await topic_analyzer.analyze_kol_contents(req.kol_id)
-        return MessageResponse(
-            message=f"批量分析完成，共分析 {len(results)} 条内容",
-            data={"count": len(results)},
-        )
+        try:
+            results = await topic_analyzer.analyze_kol_contents(req.kol_id)
+            return MessageResponse(
+                message=f"批量分析完成，共分析 {len(results)} 条内容",
+                data={"count": len(results)},
+            )
+        except RuntimeError as e:
+            return MessageResponse(message=f"分析失败: {e}")
 
     return MessageResponse(message="请指定content_id或kol_id")
 

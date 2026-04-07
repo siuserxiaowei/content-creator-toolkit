@@ -770,7 +770,10 @@ createApp({
             try{const d=await api('/crawl/kol',{method:'POST',body:{kol_id:kol.id,max_count:20}});
                 rmToast(t);toast(d.message,'success',4000);loadContents();loadStats()}catch(e){rmToast(t);toast(`抓取失败: ${e.message}`,'error',4000)}};
         const crawlComments = async item=>{const t=toast('抓取评论中...','loading');
-            try{const d=await api('/crawl/comments',{method:'POST',body:{content_id:item.id}});rmToast(t);toast(d.message,'success')}catch(e){rmToast(t);toast('失败','error')}};
+            try{const d=await api('/crawl/comments',{method:'POST',body:{content_id:item.id}});rmToast(t);
+                if(d.new_count>0){toast(`${d.message}，点击标题查看详情`,'success',4000);loadContents()}
+                else{toast(d.message||'未抓到评论（平台可能需要Cookie或不支持）','info',4000)}
+            }catch(e){rmToast(t);toast('抓取失败','error')}};
         const doSearch = async()=>{if(!searchForm.keyword)return;searching.value=true;searchDone.value=false;
             try{const d=await api('/crawl/search',{method:'POST',body:{...searchForm,max_count:20}});
                 searchResults.value=d?.items||[];searchDone.value=true;toast(`找到${d.total}条`,'success')}catch(e){searchDone.value=true;toast('搜索失败','error')}
@@ -780,7 +783,10 @@ createApp({
         const analyzeKol = async kol=>{const t=toast(`分析 ${kol.name}...`,'loading');
             try{const d=await api('/analysis/analyze',{method:'POST',body:{kol_id:kol.id}});rmToast(t);toast(d.message,'success',4000);loadTrends();loadContents()}catch(e){rmToast(t);toast('失败','error')}};
         const analyzeContent = async id=>{const t=toast('分析中...','loading');
-            try{await api('/analysis/analyze',{method:'POST',body:{content_id:id}});rmToast(t);toast('分析完成','success');loadContents();loadTrends()}catch(e){rmToast(t);toast('失败','error')}};
+            try{const d=await api('/analysis/analyze',{method:'POST',body:{content_id:id}});rmToast(t);
+                if(d.data){toast('分析完成，可在「选题分析」查看','success',4000);loadContents();loadTrends()}
+                else{toast(d.message||'分析失败','error',5000)}
+            }catch(e){rmToast(t);toast(`分析失败: ${e.message}`,'error',5000)}};
         const genScript = async()=>{if(!newScript.topic)return;generating.value=true;const t=toast('生成中...','loading');
             try{await api('/scripts/generate',{method:'POST',body:{...newScript}});rmToast(t);toast('脚本已生成','success');
                 showGenScript.value=false;loadScripts();activeTab.value='scripts'}catch(e){rmToast(t);toast('生成失败','error')}generating.value=false};
@@ -793,9 +799,9 @@ createApp({
         const pCls = p=>({'bg-red-100 text-red-700':p==='xhs','bg-gray-800 text-white':p==='douyin','bg-sky-100 text-sky-700':p==='bilibili','bg-amber-100 text-amber-700':p==='weibo','bg-red-600 text-white':p==='youtube','bg-blue-500 text-white':p==='twitter','bg-gray-900 text-white':p==='tiktok','bg-pink-500 text-white':p==='instagram','bg-gray-100 text-gray-600':p==='other'});
         const fmtTime = t=>t?new Date(t).toLocaleString('zh-CN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'-';
         const fmtNum = n=>n>=10000?(n/10000).toFixed(1)+'w':(n||0);
-        const buildUrl = (p,uid)=>({bilibili:`https://space.bilibili.com/${uid}`,douyin:`https://www.douyin.com/user/${uid}`,xhs:`https://www.xiaohongshu.com/user/profile/${uid}`,weibo:`https://m.weibo.cn/u/${uid}`,kuaishou:`https://www.kuaishou.com/profile/${uid}`}[p]||'');
-        const uidHint = computed(()=>({bilibili:'UID数字, 如 163637592',douyin:'sec_user_id',xhs:'用户ID',weibo:'UID数字',kuaishou:'用户ID'}[newKol.platform]||''));
-        const uidHelp = computed(()=>({bilibili:'打开UP主主页，URL中的数字',douyin:'打开主页，URL中user/后面的字符串',xhs:'打开主页，URL中profile/后面的ID',weibo:'打开主页，URL中u/后面的数字',kuaishou:'打开主页，URL中profile/后面的ID'}[newKol.platform]||''));
+        const buildUrl = (p,uid)=>({bilibili:`https://space.bilibili.com/${uid}`,douyin:`https://www.douyin.com/user/${uid}`,xhs:`https://www.xiaohongshu.com/user/profile/${uid}`,weibo:`https://m.weibo.cn/u/${uid}`}[p]||'');
+        const uidHint = computed(()=>({bilibili:'UID数字, 如 163637592',douyin:'sec_user_id',xhs:'用户ID',weibo:'UID数字'}[newKol.platform]||''));
+        const uidHelp = computed(()=>({bilibili:'打开UP主主页，URL中的数字',douyin:'打开主页，URL中user/后面的字符串',xhs:'打开主页，URL中profile/后面的ID',weibo:'打开主页，URL中u/后面的数字'}[newKol.platform]||''));
 
         // URL抓取
         const extractUrl = async()=>{
@@ -836,7 +842,7 @@ createApp({
             // 平台分布饼图
             if(platformChart.value && cd.platformStats && Object.keys(cd.platformStats).length){
                 if(chartInstances.platform) chartInstances.platform.destroy();
-                const colors = {xhs:'#ef4444',douyin:'#1f2937',bilibili:'#0ea5e9',weibo:'#f59e0b',kuaishou:'#f97316'};
+                const colors = {xhs:'#ef4444',douyin:'#1f2937',bilibili:'#0ea5e9',weibo:'#f59e0b',youtube:'#dc2626',twitter:'#3b82f6',tiktok:'#111827',instagram:'#ec4899'};
                 chartInstances.platform = new Chart(platformChart.value,{
                     type:'doughnut',
                     data:{labels:Object.keys(cd.platformStats).map(p=>pNames[p]||p),

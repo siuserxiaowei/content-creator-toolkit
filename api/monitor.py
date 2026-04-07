@@ -68,7 +68,7 @@ async def monitor_dashboard(db: AsyncSession = Depends(get_db)):
 
     # 各平台内容数量
     platform_stats = {}
-    for p in ["xhs", "douyin", "bilibili", "weibo", "kuaishou"]:
+    for p in ["xhs", "douyin", "bilibili", "weibo", "youtube", "twitter", "tiktok", "instagram"]:
         cnt = await db.scalar(select(func.count(Content.id)).where(Content.platform == p))
         if cnt:
             platform_stats[p] = cnt

@@ -105,6 +105,9 @@ class TopicAnalyzer:
             )
 
             try:
+                if not settings.openai_api_key or settings.openai_api_key.startswith("your-"):
+                    raise ValueError("未配置 OPENAI_API_KEY，请在 .env 中设置有效的 API Key")
+
                 response = await self.client.chat.completions.create(
                     model=self.model,
                     messages=[{"role": "user", "content": prompt}],
@@ -134,7 +137,7 @@ class TopicAnalyzer:
 
             except Exception as e:
                 logger.error(f"LLM分析失败: {e}")
-                return None
+                raise RuntimeError(str(e))
 
     async def analyze_kol_contents(self, kol_id: int, limit: int = 20) -> list[dict]:
         """批量分析某KOL的未分析内容"""
