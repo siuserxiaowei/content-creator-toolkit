@@ -323,12 +323,106 @@
 
                 <!-- ==================== 选题分析 ==================== -->
                 <div v-if="activeTab === 'analysis'" class="space-y-5">
-                    <div v-if="!trends.length" class="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-16 text-center">
+                    <!-- 顶部操作栏：选择KOL + 分析按钮 -->
+                    <div class="bg-white rounded-2xl border border-gray-100 p-5">
+                        <div class="flex items-center justify-between flex-wrap gap-3">
+                            <div class="flex items-center space-x-3">
+                                <span class="text-sm font-medium text-gray-600">选择博主:</span>
+                                <select v-model="analysisKolId" class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-200 outline-none">
+                                    <option value="">请选择</option>
+                                    <option v-for="k in kols" :key="k.id" :value="k.id">{{ k.name }} ({{ pName(k.platform) }})</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <button @click="runKolProfile" :disabled="!analysisKolId || analysisLoading"
+                                    class="bg-purple-600 text-white px-4 py-2 rounded-xl text-sm hover:bg-purple-700 transition disabled:opacity-40 font-medium">
+                                    {{ analysisLoading === 'profile' ? '分析中...' : '&#128100; 博主画像' }}
+                                </button>
+                                <button @click="runCompare" :disabled="!analysisKolId || analysisLoading"
+                                    class="bg-amber-500 text-white px-4 py-2 rounded-xl text-sm hover:bg-amber-600 transition disabled:opacity-40 font-medium">
+                                    {{ analysisLoading === 'compare' ? '对比中...' : '&#128200; 内容对比' }}
+                                </button>
+                                <a v-if="analysisKolId" :href="API+'/analysis/export/'+analysisKolId+'?fmt=markdown'" target="_blank"
+                                    class="bg-gray-100 text-gray-700 px-4 py-2 rounded-xl text-sm hover:bg-gray-200 transition font-medium">
+                                    &#128196; 导出MD
+                                </a>
+                                <a v-if="analysisKolId" :href="API+'/analysis/export/'+analysisKolId+'?fmt=json'" target="_blank"
+                                    class="bg-gray-100 text-gray-700 px-4 py-2 rounded-xl text-sm hover:bg-gray-200 transition font-medium">
+                                    &#128203; 导出JSON
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 博主画像分析结果 -->
+                    <div v-if="kolProfile" class="bg-white rounded-2xl border border-purple-100 p-6">
+                        <h3 class="text-lg font-semibold text-purple-800 mb-4">&#128100; {{ kolProfile.kol_name }} - 博主画像分析</h3>
+                        <div class="space-y-4">
+                            <div class="bg-purple-50/50 p-4 rounded-xl">
+                                <h4 class="text-sm font-semibold text-purple-700 mb-2">(a) 擅长什么内容</h4>
+                                <p class="text-sm text-gray-700 leading-relaxed">{{ kolProfile.content_expertise }}</p>
+                            </div>
+                            <div class="bg-blue-50/50 p-4 rounded-xl">
+                                <h4 class="text-sm font-semibold text-blue-700 mb-2">(b) 视频的 Hook 模式</h4>
+                                <p class="text-sm text-gray-700 leading-relaxed">{{ kolProfile.hook_patterns }}</p>
+                            </div>
+                            <div class="bg-amber-50/50 p-4 rounded-xl">
+                                <h4 class="text-sm font-semibold text-amber-700 mb-2">(c) 哪些选题比较火</h4>
+                                <p class="text-sm text-gray-700 leading-relaxed">{{ kolProfile.hot_topics }}</p>
+                            </div>
+                            <div class="flex flex-wrap gap-2 pt-2">
+                                <span class="text-xs text-gray-500">风格标签:</span>
+                                <span v-for="tag in (kolProfile.content_style||'').split(',')" :key="tag"
+                                    class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs">{{ tag }}</span>
+                            </div>
+                            <div v-if="kolProfile.posting_strategy" class="text-sm text-gray-600 bg-gray-50 p-3 rounded-xl">
+                                <strong>发布策略:</strong> {{ kolProfile.posting_strategy }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 内容对比分析结果 -->
+                    <div v-if="kolCompare" class="bg-white rounded-2xl border border-amber-100 p-6">
+                        <h3 class="text-lg font-semibold text-amber-800 mb-4">&#128200; {{ kolCompare.kol_name }} - 内容对比分析</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <h4 class="text-sm font-semibold text-emerald-700 mb-2">(a) 爆款内容</h4>
+                                <div class="space-y-1 mb-3">
+                                    <div v-for="item in kolCompare.top_items" :key="item.title"
+                                        class="text-xs text-gray-600 bg-emerald-50 px-3 py-1.5 rounded-lg">
+                                        {{ item.title.slice(0,35) }} <span class="text-emerald-600 font-medium ml-1">&#10084;&#65039;{{ fmtNum(item.like_count) }}</span>
+                                    </div>
+                                </div>
+                                <p class="text-sm text-gray-700 bg-emerald-50/50 p-3 rounded-xl">{{ kolCompare.top_analysis }}</p>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-semibold text-gray-500 mb-2">(b) 普通内容</h4>
+                                <div class="space-y-1 mb-3">
+                                    <div v-for="item in kolCompare.bottom_items" :key="item.title"
+                                        class="text-xs text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg">
+                                        {{ item.title.slice(0,35) }} <span class="text-gray-400 ml-1">&#10084;&#65039;{{ fmtNum(item.like_count) }}</span>
+                                    </div>
+                                </div>
+                                <p class="text-sm text-gray-600 bg-gray-50/50 p-3 rounded-xl">{{ kolCompare.bottom_analysis }}</p>
+                            </div>
+                        </div>
+                        <div class="mt-4 bg-amber-50/50 p-4 rounded-xl">
+                            <h4 class="text-sm font-semibold text-amber-700 mb-2">(c) 核心差异</h4>
+                            <p class="text-sm text-gray-700 leading-relaxed">{{ kolCompare.core_differences }}</p>
+                        </div>
+                        <div v-if="kolCompare.actionable_tips" class="mt-3 text-sm text-brand-700 bg-brand-50/50 p-3 rounded-xl">
+                            <strong>改进建议:</strong> {{ kolCompare.actionable_tips }}
+                        </div>
+                    </div>
+
+                    <!-- 选题趋势列表 -->
+                    <div v-if="!trends.length && !kolProfile && !kolCompare" class="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-16 text-center">
                         <div class="text-5xl mb-4 opacity-40">&#128202;</div>
                         <h3 class="text-base font-semibold text-gray-600 mb-2">暂无分析数据</h3>
-                        <p class="text-sm text-gray-400">先抓取内容，再点「分析选题」按钮</p>
+                        <p class="text-sm text-gray-400">先抓取内容，再点「分析选题」按钮，或选择博主进行画像分析</p>
                     </div>
-                    <div v-else class="space-y-4">
+                    <div v-if="trends.length" class="space-y-4">
+                        <h3 class="text-base font-semibold text-gray-700">选题趋势排行</h3>
                         <div v-for="(t, i) in trends" :key="t.content_id"
                             class="bg-white rounded-2xl border border-gray-100 p-6 hover:shadow-md transition-all duration-200">
                             <div class="flex justify-between items-start">
@@ -360,12 +454,6 @@
                             </div>
                             <div v-if="t.replication_suggestions" class="mt-2 text-sm text-brand-700 bg-brand-50/50 p-3 rounded-xl">
                                 <strong>怎么抄:</strong> {{ t.replication_suggestions }}
-                            </div>
-                            <div class="mt-4">
-                                <button @click="generateFromTrend(t)"
-                                    class="bg-emerald-500 text-white px-5 py-2 rounded-xl text-sm hover:bg-emerald-600 transition font-medium shadow-sm">
-                                    &#9997;&#65039; 用这个选题生成脚本
-                                </button>
                             </div>
                         </div>
                     </div>
@@ -696,6 +784,10 @@ createApp({
 
         const urlInput = ref('');
         const extracting = ref(false);
+        const analysisKolId = ref('');
+        const analysisLoading = ref(false);
+        const kolProfile = ref(null);
+        const kolCompare = ref(null);
         const detailItem = ref(null);
         const chartData = ref({});
         const platformChart = ref(null);
@@ -803,6 +895,29 @@ createApp({
         const uidHint = computed(()=>({bilibili:'UID数字, 如 163637592',douyin:'sec_user_id',xhs:'用户ID',weibo:'UID数字'}[newKol.platform]||''));
         const uidHelp = computed(()=>({bilibili:'打开UP主主页，URL中的数字',douyin:'打开主页，URL中user/后面的字符串',xhs:'打开主页，URL中profile/后面的ID',weibo:'打开主页，URL中u/后面的数字'}[newKol.platform]||''));
 
+        // 博主画像分析
+        const runKolProfile = async()=>{
+            if(!analysisKolId.value)return;
+            analysisLoading.value='profile';kolProfile.value=null;
+            const t=toast('正在生成博主画像分析...','loading');
+            try{const d=await api(`/analysis/kol-profile/${analysisKolId.value}`);rmToast(t);
+                if(d.success){kolProfile.value=d.data;toast('博主画像分析完成','success',3000)}
+                else{toast(d.message||'分析失败','error',5000)}
+            }catch(e){rmToast(t);toast(`分析失败: ${e.message}`,'error',5000)}
+            analysisLoading.value=false;
+        };
+        // 内容对比分析
+        const runCompare = async()=>{
+            if(!analysisKolId.value)return;
+            analysisLoading.value='compare';kolCompare.value=null;
+            const t=toast('正在生成内容对比分析...','loading');
+            try{const d=await api(`/analysis/compare/${analysisKolId.value}`);rmToast(t);
+                if(d.success){kolCompare.value=d.data;toast('内容对比分析完成','success',3000)}
+                else{toast(d.message||'分析失败','error',5000)}
+            }catch(e){rmToast(t);toast(`分析失败: ${e.message}`,'error',5000)}
+            analysisLoading.value=false;
+        };
+
         // URL抓取
         const extractUrl = async()=>{
             if(!urlInput.value)return;
@@ -870,9 +985,10 @@ createApp({
         return {activeTab,tabs,platforms,pName,pCls,currentTabLabel,stats,kols,contents,cTotal,cPage,cPageSize,cFilter,trends,scripts,toasts,
             showAddKol,showSearch,showGenScript,generating,searching,searchDone,searchResults,searchForm,newKol,newScript,
             detailItem,chartData,platformChart,engagementChart,urlInput,extracting,
+            analysisKolId,analysisLoading,kolProfile,kolCompare,
             refreshAll,switchTab,loadContents,addKol,deleteKol,toggleMonitor,crawlKol,crawlComments,doSearch,viewKolContents,
             analyzeKol,analyzeContent,genScript,generateFromTrend,deleteScript,copyScript,fmtTime,fmtNum,uidHint,uidHelp,
-            openDetail,crawlDetailComments,refreshKolProfile,saveSearchItem,extractUrl};
+            openDetail,crawlDetailComments,refreshKolProfile,saveSearchItem,extractUrl,runKolProfile,runCompare};
     }
 }).mount('#app');
 </script>
