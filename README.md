@@ -1,5 +1,18 @@
 # 内容创作系统 Content Creator Toolkit
 
+<!-- SIUSER-SEO-INTRO:START -->
+
+## 项目介绍 / Project Introduction
+
+**中文介绍**：多平台内容创作者工具箱，支持选题、素材监控、AI 分析、内容生产和跨平台发布工作流。
+
+**English**: A multi-platform creator toolkit for topic discovery, media monitoring, AI analysis, content production, and cross-platform publishing workflows.
+
+**SEO 关键词 / SEO Keywords**: creator tools, content automation, AI analysis, social media, 内容创作者工具
+
+<!-- SIUSER-SEO-INTRO:END -->
+
+
 多平台 KOL 监控与 AI 选题分析系统。自动抓取主流社交平台的创作者内容数据，通过 AI 深度分析选题策略，帮助内容创作者发现爆款规律、提炼可复制的方法论。
 
 ![首页仪表盘](docs/screenshots/01_home.png)
@@ -148,3 +161,17 @@ python main.py
 ## License
 
 MIT
+
+<!-- SIUSER-CONTACT:START -->
+
+## 联系我 / Contact
+
+想交流 AI 工具、内容自动化、SEO、私域增长或项目合作，可以扫码加我微信。
+
+For collaboration on AI tools, content automation, SEO, private-domain growth, or product experiments, scan the WeChat QR code below.
+
+<img src="https://raw.githubusercontent.com/siuserxiaowei/siuserxiaowei/main/assets/contact/wechat-qrcode.jpg" width="180" alt="WeChat QR code / 微信二维码" />
+
+**关键词 / Keywords**: creator tools, content automation, AI analysis, social media, AI tools, AI automation, GitHub Pages, SEO
+
+<!-- SIUSER-CONTACT:END -->
