@@ -1,5 +1,73 @@
 # 内容创作系统 Content Creator Toolkit
 
+<!-- SIUSER-REPO-GUIDE:START -->
+## Repository Guide
+
+### What This Repository Does
+
+内容创作者工具箱：聚合创作者监控、AI 分析和选题自动化能力。
+
+English summary: Creator toolkit for creator monitoring, AI analysis, and content automation workflows.
+
+### Online Entry Points
+
+- GitHub repository: https://github.com/siuserxiaowei/content-creator-toolkit
+- Live / GitHub Pages: not configured for this repository
+- Default branch: `main`
+- Primary language: `Python`
+
+### How To Read / Learn This Repository
+
+1. 先读本 README，确认项目目标、在线入口和本地运行方式。
+2. 按仓库目录从入口文件、数据文件、脚本和文档依次阅读。
+3. 如果要修改内容，先小范围改动，再运行本 README 中的验证命令。
+
+### Clone This Repository
+
+```bash
+git clone https://github.com/siuserxiaowei/content-creator-toolkit.git
+cd content-creator-toolkit
+```
+
+### Run Or View Locally
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Repository Map
+
+| Path | Purpose |
+| --- | --- |
+| `README.md` | 项目入口说明，先读这里。 |
+| `docs/` | 文档或 GitHub Pages 输出目录。 |
+| `scripts/` | 构建、同步、生成或维护脚本。 |
+| `tests/` | 测试用例或验证脚本。 |
+| `DEV_LOG.md` | 项目文件。 |
+| `api/` | 项目目录。 |
+| `config/` | 项目目录。 |
+| `core/` | 项目目录。 |
+| `main.py` | 项目文件。 |
+| `requirements.txt` | 项目文件。 |
+| `storage/` | 项目目录。 |
+| `web/` | 项目目录。 |
+
+### Maintenance Notes
+
+- Keep this README in sync when the project purpose, live link, or run commands change.
+- Prefer small, focused commits when changing code, data, or generated pages.
+- Run the relevant build or validation command before publishing changes.
+- If this is a generated/static archive, update the source data first, then regenerate the public files.
+
+### Privacy And Safety
+
+- Do not commit API keys, tokens, passwords, cookies, private URLs, or internal account data.
+- Keep private source material out of public GitHub Pages output unless it has been explicitly cleared for publication.
+- When in doubt, run a quick secret scan such as `rg -n "token|secret|password|access_key|authorization"` before pushing.
+<!-- SIUSER-REPO-GUIDE:END -->
+
 <!-- SIUSER-SEO-INTRO:START -->
 
 ## 项目介绍 / Project Introduction
@@ -11,7 +79,6 @@
 **SEO 关键词 / SEO Keywords**: creator tools, content automation, AI analysis, social media, 内容创作者工具
 
 <!-- SIUSER-SEO-INTRO:END -->
-
 
 多平台 KOL 监控与 AI 选题分析系统。自动抓取主流社交平台的创作者内容数据，通过 AI 深度分析选题策略，帮助内容创作者发现爆款规律、提炼可复制的方法论。
 
